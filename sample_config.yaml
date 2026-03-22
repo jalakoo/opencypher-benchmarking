@@ -1,0 +1,59 @@
+# sample_config.yaml
+databases:
+  neo4j:
+    adapter: bolt
+    host: localhost
+    port: 7687
+    auth:
+      username: neo4j
+      password: neo4j_pass
+    enabled: true
+
+  memgraph:
+    adapter: bolt
+    host: localhost
+    port: 7688
+    auth:
+      username: ""
+      password: ""
+    enabled: true
+
+  arcadedb:
+    adapter: bolt
+    host: localhost
+    port: 7689
+    auth:
+      username: root
+      password: arcadedb_pass
+    enabled: true
+
+  falkordb:
+    adapter: falkordb
+    host: localhost
+    port: 6379
+    auth:
+      password: ""
+    graph_name: benchmark
+    enabled: true
+
+  falkordb_lite:
+    adapter: falkordblite
+    db_path: /tmp/falkordb_bench.db
+    graph_name: benchmark
+    enabled: true
+
+  ladybugdb:
+    adapter: ladybugdb
+    db_path: /tmp/ladybug_bench
+    enabled: true
+
+benchmark:
+  iterations: 5
+  warmup_iterations: 2
+  timeout_seconds: 30
+  dataset_scale: 1
+  concurrency: 8
+
+output:
+  report_path: ./reports/report.html
+  raw_json_path: ./reports/results.json

@@ -1,0 +1,14 @@
+.cache/
+.venv/
+reports/
+__pycache__/
+*.egg-info/
+*.pyc
+dist/
+build/
+.ruff_cache/
+
+
+1_PROMPT.md
+2_PROMPT_REFINED.md
+3_BUILD_PLAN.md

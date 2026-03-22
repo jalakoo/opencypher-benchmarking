@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graph-db-comparison"
+version = "0.1.0"
+requires-python = ">=3.12"
+description = "Performance comparison tool for graph databases"
+license = "MIT"
+dependencies = ["pyyaml", "jinja2"]
+
+[project.optional-dependencies]
+server = ["neo4j", "falkordb", "opencypher-compliance[all]"]
+embedded = ["falkordblite", "real_ladybug"]
+dev = ["pytest", "ruff"]
+all = ["graph-db-comparison[server,embedded,dev]"]
+
+[project.scripts]
+graph-db-bench = "graph_db_comparison.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
