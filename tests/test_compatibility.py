@@ -10,6 +10,7 @@ import pytest
 from graph_db_comparison.compatibility import (
     _build_feature_map,
     _build_feature_map_from_tests,
+    _parse_pass_rate,
     _validate_result,
     check_benchmark_eligible,
     check_tier_eligible,
@@ -256,6 +257,44 @@ def test_validate_result_pass_no_expectations():
     result = Result(records=[{"x": 1}])
     test = {}
     assert _validate_result(result, test) is True
+
+
+# --- _parse_pass_rate ---
+
+
+def test_parse_pass_rate_float():
+    """Float value passes through."""
+    assert _parse_pass_rate(0.87) == 0.87
+
+
+def test_parse_pass_rate_int():
+    """Int value is converted to float."""
+    assert _parse_pass_rate(1) == 1.0
+
+
+def test_parse_pass_rate_percentage_string():
+    """String like '87.50%' is parsed to 0.875."""
+    assert _parse_pass_rate("87.50%") == pytest.approx(0.875)
+
+
+def test_parse_pass_rate_100_percent_string():
+    """String '100.00%' is parsed to 1.0."""
+    assert _parse_pass_rate("100.00%") == pytest.approx(1.0)
+
+
+def test_parse_pass_rate_zero_string():
+    """String '0%' is parsed to 0.0."""
+    assert _parse_pass_rate("0%") == 0.0
+
+
+def test_parse_pass_rate_garbage_string():
+    """Unparseable string returns 0.0."""
+    assert _parse_pass_rate("not_a_number") == 0.0
+
+
+def test_parse_pass_rate_none():
+    """None returns 0.0."""
+    assert _parse_pass_rate(None) == 0.0
 
 
 # --- Compliance caching ---

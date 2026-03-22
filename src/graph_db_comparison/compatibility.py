@@ -90,6 +90,26 @@ def run_embedded_compliance(
         return None
 
 
+# --- Helpers ---
+
+
+def _parse_pass_rate(value: Any) -> float:
+    """Parse pass_rate from opencypher-compliance, handling both float and string formats."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = value.strip().rstrip("%")
+        try:
+            rate = float(cleaned)
+            # If it was "87.5%" convert from percentage to 0-1 range
+            if rate > 1.0:
+                return rate / 100.0
+            return rate
+        except ValueError:
+            return 0.0
+    return 0.0
+
+
 # --- Feature map builders ---
 
 
@@ -119,7 +139,7 @@ def _build_feature_map(results: dict[str, Any]) -> FeatureSupportMap:
         functions=functions,
         operators=operators,
         data_types=data_types,
-        pass_rate=results.get("metadata", {}).get("pass_rate", 0.0),
+        pass_rate=_parse_pass_rate(results.get("metadata", {}).get("pass_rate", 0.0)),
     )
 
 
