@@ -162,12 +162,14 @@ def _compute_radar_data(report: FullReport) -> dict[str, dict[str, float]]:
         passed = sum(1 for r in db.results if r.status == "pass")
 
         raw[db.name] = {
-            "read_latency": sum(read_medians) / len(read_medians) if read_medians else float("inf"),
-            "write_latency": (
-                sum(write_medians) / len(write_medians) if write_medians else float("inf")
+            "read_latency": (
+                float(sum(read_medians) / len(read_medians)) if read_medians else float("inf")
             ),
-            "compliance": db.compliance.pass_rate * 100 if db.compliance else 0,
-            "coverage": (passed / total * 100) if total > 0 else 0,
+            "write_latency": (
+                float(sum(write_medians) / len(write_medians)) if write_medians else float("inf")
+            ),
+            "compliance": float(db.compliance.pass_rate * 100) if db.compliance else 0.0,
+            "coverage": float(passed / total * 100) if total > 0 else 0.0,
         }
 
     # Normalize: for latency, lower is better (invert); for others, higher is better
@@ -175,7 +177,11 @@ def _compute_radar_data(report: FullReport) -> dict[str, dict[str, float]]:
     axes = ["read_latency", "write_latency", "compliance", "coverage"]
 
     for axis in axes:
-        values = [raw[db][axis] for db in raw if raw[db][axis] != float("inf")]
+        values = [
+            raw[db][axis]
+            for db in raw
+            if isinstance(raw[db][axis], (int, float)) and raw[db][axis] != float("inf")
+        ]
         if not values:
             for db in raw:
                 radar.setdefault(db, {})[axis] = 0

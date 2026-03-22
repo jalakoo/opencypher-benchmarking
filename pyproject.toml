@@ -12,7 +12,7 @@ dependencies = ["pyyaml", "jinja2"]
 
 [project.optional-dependencies]
 server = ["neo4j", "falkordb", "opencypher-compliance[all]"]
-embedded = ["falkordblite", "real_ladybug"]
+embedded = ["falkordblite", "real_ladybug", "numpy"]
 dev = ["pytest", "ruff"]
 all = ["graph-db-comparison[server,embedded,dev]"]
 

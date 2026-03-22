@@ -249,12 +249,19 @@ class LadybugDBAdapter:
 def _convert_falkordb_result(result: Any) -> Result:
     """Convert a FalkorDB query result to our Result type."""
     records = []
-    header = getattr(result, "header", [])
+    raw_header = getattr(result, "header", [])
     result_set = getattr(result, "result_set", [])
+    # Header can be ['name'] or [[type_id, 'name']] depending on driver version
+    header: list[str] = []
+    for col in raw_header:
+        if isinstance(col, list):
+            header.append(str(col[-1]))  # last element is the column name
+        else:
+            header.append(str(col))
     for row in result_set:
         record = {}
-        for i, col in enumerate(header):
-            record[col] = row[i] if i < len(row) else None
+        for i, col_name in enumerate(header):
+            record[col_name] = row[i] if i < len(row) else None
         records.append(record)
     return Result(records=records)
 
