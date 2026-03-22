@@ -207,7 +207,8 @@ def test_falkordblite_adapter_has_protocol_methods(mock_import):
 def test_ladybugdb_adapter_has_protocol_methods(mock_import):
     """LadybugDBAdapter has all required protocol methods."""
     mock_db = MagicMock()
-    mock_import.return_value = mock_db
+    mock_conn = MagicMock()
+    mock_import.return_value = (mock_db, mock_conn)
     from graph_db_comparison.connections import LadybugDBAdapter
 
     adapter = LadybugDBAdapter(_make_ladybugdb_config())
@@ -320,15 +321,16 @@ def test_falkordb_uses_graph_name_from_config(mock_import):
 def test_ladybugdb_setup_schema_creates_tables(mock_import):
     """LadybugDBAdapter.setup_schema() issues CREATE NODE/REL TABLE statements."""
     mock_db = MagicMock()
-    mock_import.return_value = mock_db
+    mock_conn = MagicMock()
+    mock_import.return_value = (mock_db, mock_conn)
 
     from graph_db_comparison.connections import LadybugDBAdapter
 
     adapter = LadybugDBAdapter(_make_ladybugdb_config())
     adapter.setup_schema()
-    # _import_ladybugdb returns db, adapter stores it as self._conn = db
+    # _import_ladybugdb returns (db, conn), adapter stores conn as self._conn
     # setup_schema calls self._conn.execute() for each schema statement
-    assert mock_db.execute.call_count >= 4
-    calls = [str(c) for c in mock_db.execute.call_args_list]
+    assert mock_conn.execute.call_count >= 4
+    calls = [str(c) for c in mock_conn.execute.call_args_list]
     create_calls = [c for c in calls if "CREATE" in c]
     assert len(create_calls) >= 4  # Person, Company, KNOWS, WORKS_AT

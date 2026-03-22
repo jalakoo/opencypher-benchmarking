@@ -71,16 +71,18 @@ def _import_falkordb(config: DatabaseConfig):
 
 def _import_falkordblite(config: DatabaseConfig):
     """Create and return a FalkorDB Lite client instance."""
-    from falkordblite import FalkorDB
+    from redislite.falkordb_client import FalkorDB
 
     return FalkorDB(config.db_path)
 
 
 def _import_ladybugdb(config: DatabaseConfig):
-    """Create and return a LadybugDB database instance."""
-    import kuzu
+    """Create and return a LadybugDB (Database, Connection) pair."""
+    import real_ladybug
 
-    return kuzu.Database(config.db_path)
+    db = real_ladybug.Database(config.db_path)
+    conn = real_ladybug.Connection(db)
+    return db, conn
 
 
 # --- Adapter implementations ---
@@ -211,8 +213,7 @@ class LadybugDBAdapter:
 
     def __init__(self, config: DatabaseConfig) -> None:
         self._config = config
-        db = _import_ladybugdb(config)
-        self._conn = db
+        self._db, self._conn = _import_ladybugdb(config)
 
     def execute(self, cypher: str, params: dict[str, Any] | None = None) -> Result:
         result = self._conn.execute(cypher, parameters=params or {})
