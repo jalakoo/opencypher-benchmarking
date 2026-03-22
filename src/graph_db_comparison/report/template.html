@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graph DB Benchmark Report</title>
+<style>
+:root { --bg: #f8f9fa; --card: #ffffff; --border: #dee2e6; --text: #212529; --muted: #6c757d; --green: #28a745; --red: #dc3545; --grey: #adb5bd; --blue: #4285F4; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem; max-width: 1400px; margin: 0 auto; }
+h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+h2 { font-size: 1.4rem; margin: 2rem 0 1rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; }
+h3 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }
+.meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 2rem; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+.callout { background: #fff3cd; border-left: 4px solid #ffc107; padding: 1rem; margin: 1rem 0; border-radius: 4px; font-size: 0.9rem; }
+.callout.info { background: #d1ecf1; border-left-color: #17a2b8; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+.badge.server { background: #e3f2fd; color: #1565c0; }
+.badge.embedded { background: #f3e5f5; color: #7b1fa2; }
+.badge.winner { background: #c8e6c9; color: #2e7d32; }
+table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: #f1f3f5; cursor: pointer; user-select: none; white-space: nowrap; }
+th:hover { background: #e9ecef; }
+.pass { color: var(--green); font-weight: 600; }
+.skip { color: var(--grey); }
+.error { color: var(--red); font-weight: 600; }
+.fastest { background: #e8f5e9; }
+.slowest { background: #ffebee; }
+.check { color: var(--green); }
+.cross { color: var(--red); }
+details { margin: 0.5rem 0; }
+summary { cursor: pointer; font-weight: 600; padding: 0.5rem; background: #f1f3f5; border-radius: 4px; }
+summary:hover { background: #e9ecef; }
+.bar-chart { margin: 1rem 0; }
+.narrative { font-size: 1rem; line-height: 1.8; margin: 1rem 0; }
+pre { background: #f1f3f5; padding: 1rem; border-radius: 4px; overflow-x: auto; font-size: 0.8rem; }
+.radar-container { text-align: center; margin: 1.5rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Graph Database Performance Comparison</h1>
+<div class="meta">Generated: {{ timestamp }} | Version: {{ version }}</div>
+
+<!-- Executive Summary -->
+<h2>Executive Summary</h2>
+<div class="card">
+  <p class="narrative">{{ narrative }}</p>
+
+  {% if tier_winners %}
+  <h3>Tier Winners</h3>
+  {% for tier, db in tier_winners.items() %}
+    <span class="badge winner">{{ tier }}: {{ db }}</span>
+  {% endfor %}
+  {% endif %}
+
+  <div class="callout info">
+    <strong>Embedded vs. Server:</strong> Embedded databases run in-process with zero network overhead.
+    Direct latency comparisons between [server] and [embedded] databases should be interpreted with this context.
+  </div>
+
+  {% if radar_svg %}
+  <div class="radar-container">
+    <h3>Multi-Dimensional Comparison</h3>
+    {{ radar_svg }}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Compliance Matrix -->
+<h2>Compliance Matrix</h2>
+<div class="card">
+  {% if compliance_matrix %}
+  <table id="compliance-table">
+    <thead>
+      <tr>
+        <th onclick="sortTable('compliance-table', 0)">Feature</th>
+        {% for db in databases %}
+        <th>{{ db.name }} <span class="badge {{ db.mode }}">{{ db.mode }}</span></th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in compliance_matrix %}
+      <tr>
+        <td>{{ row.feature }}</td>
+        {% for db in databases %}
+        <td>{% if row.get(db.name) %}<span class="check">&#10003;</span>{% else %}<span class="cross">&#10007;</span>{% endif %}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No compliance data available.</p>
+  {% endif %}
+</div>
+
+<!-- Warm vs Cold -->
+<h2>Warm vs. Cold Comparison</h2>
+<div class="card">
+  {% if warm_vs_cold %}
+  <table id="warm-cold-table">
+    <thead>
+      <tr>
+        <th onclick="sortTable('warm-cold-table', 0)">Database</th>
+        <th onclick="sortTable('warm-cold-table', 1)">Benchmark</th>
+        <th onclick="sortTable('warm-cold-table', 2)">Cold (ms)</th>
+        <th onclick="sortTable('warm-cold-table', 3)">Warm Median (ms)</th>
+        <th onclick="sortTable('warm-cold-table', 4)">Cold/Warm Ratio</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in warm_vs_cold %}
+      <tr>
+        <td>{{ entry.database }}</td>
+        <td>{{ entry.benchmark }}</td>
+        <td>{{ "%.2f"|format(entry.cold_ns / 1000000) }}</td>
+        <td>{{ "%.2f"|format(entry.warm_median_ns / 1000000) }}</td>
+        <td>{{ entry.ratio }}x</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No warm/cold comparison data available.</p>
+  {% endif %}
+</div>
+
+<!-- Benchmark Results by Tier -->
+<h2>Benchmark Results by Tier</h2>
+{% for tier, rows in tier_tables.items() %}
+<div class="card">
+  <h3>{{ tier|capitalize }} Tier
+    {% if tier_winners.get(tier) %}<span class="badge winner">Winner: {{ tier_winners[tier] }}</span>{% endif %}
+  </h3>
+  <table id="tier-{{ tier }}">
+    <thead>
+      <tr>
+        <th onclick="sortTable('tier-{{ tier }}', 0)">Benchmark</th>
+        <th>Category</th>
+        {% for db in databases %}
+        <th onclick="sortTable('tier-{{ tier }}', {{ loop.index0 * 2 + 2 }})">{{ db.name }} <span class="badge {{ db.mode }}">{{ db.mode }}</span> Median (ms)</th>
+        <th>Status</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.benchmark }}</td>
+        <td>{{ row.category }}</td>
+        {% for db in databases %}
+          {% set median_key = db.name ~ "_median" %}
+          {% set status_key = db.name ~ "_status" %}
+          {% set median = row.get(median_key) %}
+          {% set status = row.get(status_key, "—") %}
+          <td>{% if median is not none %}{{ "%.2f"|format(median / 1000000) }}{% else %}—{% endif %}</td>
+          <td class="{{ status }}">{{ status }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Bar chart -->
+  {% set chart_rows = [] %}
+  {% for row in rows %}
+    {% for db in databases %}
+      {% set median_key = db.name ~ "_median" %}
+      {% if row.get(median_key) is not none %}
+        {% set _ = chart_rows.append({"db": db.name, "bench": row.benchmark, "val": row[median_key]}) %}
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+  {% if chart_rows %}
+    {% set max_val = chart_rows|map(attribute='val')|max %}
+    <div class="bar-chart">
+    <svg width="100%" height="{{ chart_rows|length * 28 + 20 }}" viewBox="0 0 600 {{ chart_rows|length * 28 + 20 }}">
+      {% for item in chart_rows %}
+        {% set bar_w = (item.val / max_val * 400) if max_val > 0 else 0 %}
+        {% set color = db_colors.get(item.db, "#999") %}
+        <rect x="150" y="{{ loop.index0 * 28 + 5 }}" width="{{ bar_w|round(0) }}" height="20" fill="{{ color }}" rx="3"/>
+        <text x="145" y="{{ loop.index0 * 28 + 19 }}" text-anchor="end" font-size="10" fill="#333">{{ item.db }}/{{ item.bench }}</text>
+        <text x="{{ 155 + bar_w|round(0) }}" y="{{ loop.index0 * 28 + 19 }}" font-size="10" fill="#666">{{ "%.2f"|format(item.val / 1000000) }}ms</text>
+      {% endfor %}
+    </svg>
+    </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+<!-- Read vs Write Breakdown -->
+<h2>Read vs Write Breakdown</h2>
+<div class="card">
+  {% for category in ["read", "write", "mixed"] %}
+    {% if read_write.get(category) %}
+    <h3>{{ category|capitalize }} Operations</h3>
+    <table>
+      <thead><tr><th>Database</th><th>Mode</th><th>Benchmark</th><th>Median (ms)</th><th>P95 (ms)</th></tr></thead>
+      <tbody>
+      {% for entry in read_write[category] %}
+        <tr>
+          <td>{{ entry.database }}</td>
+          <td><span class="badge {{ entry.mode }}">{{ entry.mode }}</span></td>
+          <td>{{ entry.benchmark }}</td>
+          <td>{% if entry.median_ns is not none %}{{ "%.2f"|format(entry.median_ns / 1000000) }}{% else %}—{% endif %}</td>
+          <td>{% if entry.p95_ns is not none %}{{ "%.2f"|format(entry.p95_ns / 1000000) }}{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<!-- Detailed Results -->
+<h2>Detailed Results</h2>
+<div class="card">
+  {% for db in databases %}
+  <details>
+    <summary>{{ db.name }} <span class="badge {{ db.mode }}">{{ db.mode }}</span></summary>
+    <table>
+      <thead><tr><th>Benchmark</th><th>Tier</th><th>Status</th><th>Median (ms)</th><th>Min (ms)</th><th>Max (ms)</th><th>Std Dev (ms)</th><th>Iterations</th></tr></thead>
+      <tbody>
+      {% for r in detail_results.get(db.name, []) %}
+        <tr>
+          <td>{{ r.benchmark }}</td>
+          <td>{{ r.tier }}</td>
+          <td class="{{ r.status }}">{{ r.status }}{% if r.skipped_reason %}: {{ r.skipped_reason }}{% endif %}</td>
+          <td>{% if r.median_ns is not none %}{{ "%.2f"|format(r.median_ns / 1000000) }}{% else %}—{% endif %}</td>
+          <td>{% if r.min_ns is not none %}{{ "%.2f"|format(r.min_ns / 1000000) }}{% else %}—{% endif %}</td>
+          <td>{% if r.max_ns is not none %}{{ "%.2f"|format(r.max_ns / 1000000) }}{% else %}—{% endif %}</td>
+          <td>{% if r.std_dev_ns is not none %}{{ "%.2f"|format(r.std_dev_ns / 1000000) }}{% else %}—{% endif %}</td>
+          <td>{{ r.iterations }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endfor %}
+</div>
+
+<!-- Skipped Benchmarks -->
+<h2>Skipped Benchmarks</h2>
+<div class="card">
+  {% if skipped %}
+  <table id="skipped-table">
+    <thead>
+      <tr>
+        <th onclick="sortTable('skipped-table', 0)">Database</th>
+        <th onclick="sortTable('skipped-table', 1)">Benchmark</th>
+        <th>Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in skipped %}
+      <tr>
+        <td>{{ s.database }}</td>
+        <td>{{ s.benchmark }}</td>
+        <td>{{ s.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No benchmarks were skipped.</p>
+  {% endif %}
+</div>
+
+<!-- Environment Info -->
+<h2>Environment Info</h2>
+<div class="card">
+  <pre>{{ config_redacted | tojson(indent=2) }}</pre>
+</div>
+
+<!-- Inline JS: table sorting -->
+<script>
+function sortTable(tableId, colIdx) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const tbody = table.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const dir = table.dataset.sortDir === 'asc' ? 'desc' : 'asc';
+  table.dataset.sortDir = dir;
+  rows.sort((a, b) => {
+    let av = a.cells[colIdx]?.textContent.trim() || '';
+    let bv = b.cells[colIdx]?.textContent.trim() || '';
+    const an = parseFloat(av), bn = parseFloat(bv);
+    if (!isNaN(an) && !isNaN(bn)) return dir === 'asc' ? an - bn : bn - an;
+    return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+</script>
+
+</body>
+</html>
