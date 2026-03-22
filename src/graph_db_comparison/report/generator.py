@@ -28,6 +28,26 @@ DB_COLORS = [
 ]
 
 
+def _safe_pass_rate(value: Any) -> float:
+    """Convert pass_rate to a 0-100 float, handling both float and string formats."""
+    if isinstance(value, str):
+        cleaned = value.strip().rstrip("%")
+        try:
+            rate = float(cleaned)
+            # Already in 0-100 range if it came as percentage string
+            return min(rate, 100.0)
+        except ValueError:
+            return 0.0
+    try:
+        rate = float(value)
+        # If 0-1 range, scale to 0-100
+        if rate <= 1.0:
+            return rate * 100.0
+        return min(rate, 100.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def aggregate_report_data(report: FullReport) -> dict[str, Any]:
     """Transform FullReport into template-friendly dicts."""
     databases = _build_database_summaries(report)
@@ -168,7 +188,7 @@ def _compute_radar_data(report: FullReport) -> dict[str, dict[str, float]]:
             "write_latency": (
                 float(sum(write_medians) / len(write_medians)) if write_medians else float("inf")
             ),
-            "compliance": float(db.compliance.pass_rate * 100) if db.compliance else 0.0,
+            "compliance": _safe_pass_rate(db.compliance.pass_rate) if db.compliance else 0.0,
             "coverage": float(passed / total * 100) if total > 0 else 0.0,
         }
 
