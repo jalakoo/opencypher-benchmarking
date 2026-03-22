@@ -52,21 +52,7 @@ This starts Neo4j, Memgraph, ArcadeDB, and FalkorDB with ports matching the samp
 
 Embedded databases (FalkorDB Lite, LadybugDB) require no Docker — they run in-process as Python packages.
 
-### 2. Install the tool
-
-```bash
-pip install -e ".[all]"
-```
-
-Or install only what you need:
-
-```bash
-pip install -e ".[server]"    # Server-mode DBs only
-pip install -e ".[embedded]"  # Embedded DBs only
-pip install -e ".[dev]"       # Testing tools (pytest, ruff)
-```
-
-### 3. Configure
+### 2. Configure
 
 Copy and edit the sample config:
 
@@ -75,23 +61,32 @@ cp sample_config.yaml config.yaml
 # Edit config.yaml with your database credentials/ports
 ```
 
-### 4. Run benchmarks
+### 3. Run benchmarks
+
+The easiest way is `run_bench.sh`, which auto-creates a virtual environment and installs all dependencies on first run:
 
 ```bash
 # Full run (all databases, all tiers)
-graph-db-bench -c config.yaml -v
+./run_bench.sh -c config.yaml -v
 
 # Single database, single tier
-graph-db-bench -c config.yaml -d neo4j -t basic -v
+./run_bench.sh -c config.yaml -d neo4j -t basic -v
 
 # Check connectivity first
-graph-db-bench -c config.yaml --check
+./run_bench.sh -c config.yaml --check
 
 # Compliance only (no benchmarks)
-graph-db-bench -c config.yaml --compliance-only
+./run_bench.sh -c config.yaml --compliance-only
 ```
 
-### 5. View report
+All arguments are forwarded to `graph-db-bench`. If you prefer to manage the environment yourself:
+
+```bash
+pip install -e ".[all]"       # or: .[server], .[embedded]
+graph-db-bench -c config.yaml -v
+```
+
+### 4. View report
 
 Open `./reports/report.html` in a browser. Raw data is in `./reports/results.json`.
 
