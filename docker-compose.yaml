@@ -1,0 +1,34 @@
+# docker-compose.yaml
+# Starts all 4 server-mode databases for benchmarking.
+# No volume mounts — ephemeral containers for reproducible clean-state benchmarks.
+# Ports match sample_config.yaml.
+
+services:
+  neo4j:
+    image: neo4j:latest
+    ports:
+      - "7687:7687"
+      - "7474:7474"
+    environment:
+      NEO4J_AUTH: neo4j/neo4j_pass
+
+  memgraph:
+    image: memgraph/memgraph:latest
+    ports:
+      - "7688:7687"
+
+  arcadedb:
+    image: arcadedata/arcadedb:latest
+    ports:
+      - "7689:7687"
+      - "2480:2480"
+    environment:
+      JAVA_OPTS: >-
+        -Darcadedb.server.rootPassword=arcadedb_pass
+        -Darcadedb.server.defaultDatabases=benchmark[root]
+        -Darcadedb.server.plugins=Bolt:com.arcadedb.bolt.BoltProtocolPlugin
+
+  falkordb:
+    image: falkordb/falkordb:latest
+    ports:
+      - "6379:6379"
