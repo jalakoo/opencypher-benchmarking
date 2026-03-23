@@ -2,7 +2,7 @@
 
 A Python-based benchmarking tool that compares six graph databases using openCypher queries across basic, intermediate, and advanced workloads.
 
-![openCypher Benchmarking Report](https://raw.githubusercontent.com/jalakoo/opencypher-benchmarking/main/assets/report_2026_03_17.png)
+![openCypher Benchmarking Report](https://raw.githubusercontent.com/jalakoo/opencypher-benchmarking/main/assets/report.png)
 
 ## Table of Contents
 
