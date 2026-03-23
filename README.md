@@ -35,6 +35,7 @@ This tool benchmarks **Neo4j**, **Memgraph**, **ArcadeDB**, **FalkorDB**, **Falk
 - **HTML report**: self-contained with scorecard grid, sortable tables, bar charts, tabbed navigation
 - **JSON export**: raw results for programmatic analysis
 - **Compliance caching**: avoids re-running the full compliance suite on every run
+- **Incremental runs**: re-run a single database with `--merge` to update an existing report
 - **Resilient**: one database failure doesn't stop the others
 
 ## Prerequisites
@@ -83,6 +84,9 @@ The easiest way is `run_bench.sh`, which auto-creates a virtual environment and 
 
 # Regenerate HTML report from existing results (no benchmarks rerun)
 ./run_bench.sh --from-json reports/results.json
+
+# Re-run one database and merge into existing report
+./run_bench.sh -c config.yaml -d ladybugdb --merge
 ```
 
 All arguments are forwarded to `ocb`. If you prefer to manage the environment yourself:
@@ -93,7 +97,12 @@ ocb -c config.yaml -v
 
 # Regenerate HTML from existing JSON results
 ocb --from-json reports/results.json
+
+# Re-run one database and merge into existing report
+ocb -c config.yaml -d ladybugdb --merge
 ```
+
+> **Note:** The `ocb` command requires `pip install -e .` (or `pip install -e ".[all]"`) to register the CLI entry point. The `run_bench.sh` script handles this automatically.
 
 ### 4. View report
 
@@ -267,6 +276,7 @@ Options:
   --compliance-ttl SECONDS    Compliance cache TTL [default: 86400]
   --check                     Ping databases and report status, then exit
   --from-json PATH            Regenerate HTML report from existing results.json, then exit
+  --merge                     Merge new results into existing results.json in the output dir
   --no-report                 Skip HTML report, output JSON only
   --output-dir PATH           Output directory [default: ./reports]
   -v, --verbose               Verbose logging
@@ -310,6 +320,8 @@ pytest tests/ -v
 **FalkorDB graph name:** FalkorDB requires a graph name (no server-side default). Set `graph_name` in config (default: `"benchmark"`).
 
 **LadybugDB schema errors:** LadybugDB requires explicit table definitions before inserting data. The adapter's `setup_schema()` handles this automatically.
+
+**Benchmarks all skipped after a fix:** If a database adapter was broken during a prior run, the compliance cache may contain bad results (low pass rate, missing features). Use `--force-compliance` to refresh: `ocb -c config.yaml -d ladybugdb --merge --force-compliance`.
 
 **Compliance takes too long:** Use `--skip-compliance` for development. Compliance results are cached for 24 hours by default (override with `--compliance-ttl`).
 

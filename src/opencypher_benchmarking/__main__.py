@@ -116,6 +116,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Regenerate HTML report from an existing results.json file, then exit.",
     )
     parser.add_argument(
+        "--merge",
+        action="store_true",
+        help="Merge new results into existing results.json in the output directory.",
+    )
+    parser.add_argument(
         "--no-report",
         action="store_true",
         help="Skip HTML report, output JSON only.",
@@ -263,6 +268,25 @@ def run_benchmarks(args: argparse.Namespace, config: AppConfig) -> FullReport:
     )
 
 
+def merge_reports(existing: FullReport, new: FullReport) -> FullReport:
+    """Merge new database results into an existing report.
+
+    Databases in *new* replace same-named databases in *existing*.
+    Databases only in *existing* are preserved as-is.
+    """
+    merged = {db.name: db for db in existing.databases}
+    for db in new.databases:
+        merged[db.name] = db
+
+    return FullReport(
+        timestamp=new.timestamp,
+        version=new.version,
+        config=existing.config,
+        databases=list(merged.values()),
+        duration_seconds=new.duration_seconds,
+    )
+
+
 def main() -> None:
     """CLI entry point."""
     args = build_parser().parse_args()
@@ -301,6 +325,16 @@ def main() -> None:
     bench_start = time.monotonic()
     report = run_benchmarks(args, config)
     report.duration_seconds = round(time.monotonic() - bench_start, 1)
+
+    # Merge with existing results if --merge
+    if args.merge:
+        json_path = Path(args.output_dir) / "results.json"
+        try:
+            existing_report = load_report_from_json(str(json_path))
+            report = merge_reports(existing_report, report)
+            logger.info(f"Merged with existing {json_path}")
+        except FileNotFoundError:
+            logger.warning(f"No existing {json_path} found, writing fresh report.")
 
     # Generate output
     output_dir = Path(args.output_dir)

@@ -334,3 +334,27 @@ def test_ladybugdb_setup_schema_creates_tables(mock_import):
     calls = [str(c) for c in mock_conn.execute.call_args_list]
     create_calls = [c for c in calls if "CREATE" in c]
     assert len(create_calls) >= 4  # Person, Company, KNOWS, WORKS_AT
+
+
+def test_resolve_ladybugdb_path_appends_filename_to_directory(tmp_path):
+    """_resolve_ladybugdb_path appends 'ladybug.db' when path is a directory."""
+    from opencypher_benchmarking.connections import _resolve_ladybugdb_path
+
+    result = _resolve_ladybugdb_path(str(tmp_path))
+    assert result == str(tmp_path / "ladybug.db")
+
+
+def test_resolve_ladybugdb_path_appends_for_no_extension():
+    """_resolve_ladybugdb_path appends 'ladybug.db' when path has no extension."""
+    from opencypher_benchmarking.connections import _resolve_ladybugdb_path
+
+    result = _resolve_ladybugdb_path("/tmp/ladybug_bench")
+    assert result == "/tmp/ladybug_bench/ladybug.db"
+
+
+def test_resolve_ladybugdb_path_preserves_file_path():
+    """_resolve_ladybugdb_path keeps path as-is when it has a file extension."""
+    from opencypher_benchmarking.connections import _resolve_ladybugdb_path
+
+    result = _resolve_ladybugdb_path("/tmp/my_ladybug.db")
+    assert result == "/tmp/my_ladybug.db"

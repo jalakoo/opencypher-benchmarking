@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Protocol
 
 from opencypher_benchmarking.models import DatabaseConfig
@@ -76,11 +77,25 @@ def _import_falkordblite(config: DatabaseConfig):
     return FalkorDB(config.db_path)
 
 
+def _resolve_ladybugdb_path(db_path: str) -> str:
+    """Ensure db_path is a file path, not a directory.
+
+    LadybugDB (unlike Kuzu) requires a file path, not a directory.
+    If the path is an existing directory or has no file extension,
+    append 'ladybug.db'.
+    """
+    if os.path.isdir(db_path) or (not os.path.splitext(db_path)[1]):
+        return os.path.join(db_path, "ladybug.db")
+    return db_path
+
+
 def _import_ladybugdb(config: DatabaseConfig):
     """Create and return a LadybugDB (Database, Connection) pair."""
     import real_ladybug
 
-    db = real_ladybug.Database(config.db_path)
+    path = _resolve_ladybugdb_path(config.db_path)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    db = real_ladybug.Database(path)
     conn = real_ladybug.Connection(db)
     return db, conn
 
