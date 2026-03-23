@@ -183,23 +183,113 @@ def test_aggregate_tier_winner():
         assert winners["basic"] == "falkordb_lite"
 
 
-def test_aggregate_radar_chart_data():
-    """Radar chart data has normalized 0-100 scores for each database."""
+def test_aggregate_includes_duration():
+    """Duration is passed through to aggregated data."""
     report = _make_report()
+    report.duration_seconds = 42.5
     data = aggregate_report_data(report)
-    assert "radar_data" in data
-    for db_name, scores in data["radar_data"].items():
-        for axis, val in scores.items():
-            assert 0 <= val <= 100, f"{db_name}.{axis} = {val} out of range"
+    assert data["duration_seconds"] == 42.5
 
 
-def test_aggregate_compliance_matrix():
-    """Compliance matrix contains feature support per database."""
+def test_html_report_contains_duration(tmp_path):
+    """Report displays the benchmark duration."""
+    report = _make_report()
+    report.duration_seconds = 125.3
+    out = tmp_path / "report.html"
+    generate_html_report(report, str(out))
+    html = out.read_text()
+    assert "2m 5s" in html
+
+
+def test_aggregate_dataset_profile():
+    """Dataset profile is computed from benchmark config scale."""
     report = _make_report()
     data = aggregate_report_data(report)
-    assert "compliance_matrix" in data
-    matrix = data["compliance_matrix"]
-    assert len(matrix) > 0
+    assert "dataset_profile" in data
+    profile = data["dataset_profile"]
+    assert profile["scale"] == 1
+    # Basic tier uses only persons
+    assert profile["tiers"]["basic"]["persons"] == 1000
+    # Intermediate uses full social graph
+    inter = profile["tiers"]["intermediate"]
+    assert inter["persons"] == 1000
+    assert inter["companies"] == 50
+    assert inter["knows_edges"] == 5000
+    assert inter["works_at_edges"] == 1000
+    # Advanced uses 5x multiplier
+    adv = profile["tiers"]["advanced"]
+    assert adv["persons"] == 5000
+    assert adv["companies"] == 250
+    assert adv["knows_edges"] == 25000
+    assert adv["works_at_edges"] == 5000
+
+
+def test_html_report_contains_dataset_profile(tmp_path):
+    """HTML report contains the dataset profile card."""
+    report = _make_report()
+    out = tmp_path / "report.html"
+    generate_html_report(report, str(out))
+    html = out.read_text()
+    assert "Dataset Profile" in html
+    assert "1,000" in html or "1000" in html
+
+
+def test_aggregate_scorecards():
+    """Scorecards are produced with rank, avg_median_ms, pass count, best tier."""
+    report = _make_report()
+    data = aggregate_report_data(report)
+    assert "scorecards" in data
+    cards = data["scorecards"]
+    assert len(cards) == 2
+    # falkordb_lite should be rank 1 (lower avg median)
+    assert cards[0]["name"] == "falkordb_lite"
+    assert cards[0]["rank"] == 1
+    assert cards[1]["name"] == "neo4j"
+    assert cards[1]["rank"] == 2
+    # Check required fields
+    for card in cards:
+        assert "avg_median_ms" in card
+        assert "benchmarks_passed" in card
+        assert "benchmarks_total" in card
+        assert "best_tier" in card
+        assert "mode" in card
+
+
+def test_aggregate_cold_warm_summary():
+    """Cold/warm summary has one row per database with avg/max ratio."""
+    report = _make_report()
+    data = aggregate_report_data(report)
+    assert "cold_warm_summary" in data
+    summary = data["cold_warm_summary"]
+    assert len(summary) == 2
+    for row in summary:
+        assert "name" in row
+        assert "avg_ratio" in row
+        assert "max_ratio" in row
+        assert "worst_benchmark" in row
+        assert row["avg_ratio"] > 0
+
+
+def test_aggregate_no_compliance_matrix():
+    """Compliance matrix is no longer included in aggregated data."""
+    report = _make_report()
+    data = aggregate_report_data(report)
+    assert "compliance_matrix" not in data
+
+
+def test_aggregate_no_radar_data():
+    """Radar chart data is no longer included in aggregated data."""
+    report = _make_report()
+    data = aggregate_report_data(report)
+    assert "radar_data" not in data
+    assert "radar_svg" not in data
+
+
+def test_aggregate_no_read_write_breakdown():
+    """Read/write breakdown is no longer included (duplicates tier tables)."""
+    report = _make_report()
+    data = aggregate_report_data(report)
+    assert "read_write" not in data
 
 
 def test_aggregate_skipped_benchmarks():
@@ -212,7 +302,7 @@ def test_aggregate_skipped_benchmarks():
 
 
 def test_aggregate_warm_vs_cold():
-    """Warm vs cold comparison data is populated."""
+    """Warm vs cold full detail data is still populated."""
     report = _make_report()
     data = aggregate_report_data(report)
     assert "warm_vs_cold" in data
@@ -248,9 +338,59 @@ def test_html_report_contains_section_headers(tmp_path):
     out = tmp_path / "report.html"
     generate_html_report(report, str(out))
     html = out.read_text()
-    assert "Executive Summary" in html
-    assert "Compliance Matrix" in html
+    assert "Graph Database Performance Comparison" in html
     assert "Benchmark Results" in html
+
+
+def test_html_report_no_compliance_section(tmp_path):
+    """Compliance matrix section is not in the report."""
+    report = _make_report()
+    out = tmp_path / "report.html"
+    generate_html_report(report, str(out))
+    html = out.read_text()
+    assert "Compliance Matrix" not in html
+
+
+def test_html_report_no_radar_chart(tmp_path):
+    """Radar chart is not in the report."""
+    report = _make_report()
+    out = tmp_path / "report.html"
+    generate_html_report(report, str(out))
+    html = out.read_text()
+    assert "Multi-Dimensional Comparison" not in html
+    assert "radar" not in html.lower()
+
+
+def test_html_report_has_limitations_tab(tmp_path):
+    """Report contains a Limitations tab with key caveats."""
+    report = _make_report()
+    out = tmp_path / "report.html"
+    generate_html_report(report, str(out))
+    html = out.read_text()
+    assert "Limitations" in html
+    assert "tab-limitations" in html
+    assert "production workload" in html.lower() or "production" in html.lower()
+
+
+def test_html_report_has_scorecards(tmp_path):
+    """Report contains database scorecard elements."""
+    report = _make_report()
+    out = tmp_path / "report.html"
+    generate_html_report(report, str(out))
+    html = out.read_text()
+    assert "scorecard" in html.lower() or "score-card" in html.lower()
+    assert "neo4j" in html
+    assert "falkordb_lite" in html
+    assert "#1" in html or "Rank" in html
+
+
+def test_html_report_has_tabs(tmp_path):
+    """Report uses tab navigation."""
+    report = _make_report()
+    out = tmp_path / "report.html"
+    generate_html_report(report, str(out))
+    html = out.read_text()
+    assert "tab" in html.lower()
 
 
 def test_html_report_contains_server_embedded_tags(tmp_path):
@@ -310,3 +450,59 @@ def test_json_report_redacts_passwords(tmp_path):
     generate_json_report(report, str(out))
     text = out.read_text()
     assert "secret123" not in text
+
+
+# --- load_report_from_json ---
+
+
+def test_load_report_from_json_roundtrip(tmp_path):
+    """A report saved as JSON can be loaded back and used to generate HTML."""
+    from graph_db_comparison.report.generator import load_report_from_json
+
+    report = _make_report()
+    json_path = tmp_path / "results.json"
+    generate_json_report(report, str(json_path))
+
+    loaded = load_report_from_json(str(json_path))
+    assert loaded.version == "0.1.0"
+    assert len(loaded.databases) == 2
+    assert loaded.databases[0].name == "neo4j"
+    assert loaded.databases[0].mode == "server"
+    assert loaded.databases[1].name == "falkordb_lite"
+    assert loaded.databases[1].mode == "embedded"
+
+
+def test_load_report_from_json_produces_valid_html(tmp_path):
+    """A loaded JSON report can be rendered to valid HTML."""
+    from graph_db_comparison.report.generator import load_report_from_json
+
+    report = _make_report()
+    json_path = tmp_path / "results.json"
+    html_path = tmp_path / "report.html"
+    generate_json_report(report, str(json_path))
+
+    loaded = load_report_from_json(str(json_path))
+    generate_html_report(loaded, str(html_path))
+    html = html_path.read_text()
+    assert "<!DOCTYPE html>" in html
+    assert "scorecard" in html.lower()
+    assert "neo4j" in html
+
+
+def test_load_report_from_json_preserves_results(tmp_path):
+    """Loaded report preserves benchmark result data."""
+    from graph_db_comparison.report.generator import load_report_from_json
+
+    report = _make_report()
+    json_path = tmp_path / "results.json"
+    generate_json_report(report, str(json_path))
+
+    loaded = load_report_from_json(str(json_path))
+    neo4j = loaded.databases[0]
+    passed = [r for r in neo4j.results if r.status == "pass"]
+    assert len(passed) == 2
+    match_result = next(r for r in passed if r.benchmark_name == "match_all_nodes")
+    assert match_result.median_ns == 1_000_000
+    assert match_result.cold_latency_ns == 5_000_000
+    assert match_result.tier == "basic"
+    assert match_result.category == "read"

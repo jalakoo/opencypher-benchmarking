@@ -129,13 +129,13 @@ def test_build_feature_map_actual_package_format():
 
 
 def test_build_feature_map_from_tests_passed_only():
-    """Feature map built from passed/failed test lists."""
+    """Feature map built from passed/failed test lists (catalog format uses 'name' + 'type')."""
     passed = [
-        {"name": "T1", "category": "clause", "feature": "MATCH"},
-        {"name": "T2", "category": "function", "feature": "count"},
+        {"name": "MATCH", "type": "clause"},
+        {"name": "count", "type": "function"},
     ]
     failed = [
-        {"name": "T3", "category": "clause", "feature": "CREATE"},
+        {"name": "CREATE", "type": "clause"},
     ]
     all_tests = passed + failed
     fm = _build_feature_map_from_tests(passed, failed, all_tests)
@@ -283,6 +283,41 @@ def test_validate_result_pass_no_expectations():
     assert _validate_result(result, test) is True
 
 
+def test_validate_result_dict_records_vs_list_expected_rows():
+    """Validation passes when records are dicts but expected_rows are lists.
+
+    The opencypher catalog uses list-of-lists for expected_rows (positional),
+    but our adapters return list-of-dicts (keyed by column name). The validator
+    must compare by values when the formats differ.
+    """
+    result = Result(records=[{"name": "Alice"}])
+    test = {
+        "expected_columns": ["name"],
+        "expected_rows": [["Alice"]],
+    }
+    assert _validate_result(result, test) is True
+
+
+def test_validate_result_dict_records_vs_list_expected_rows_multi():
+    """Multi-row, multi-column comparison between dict records and list expected."""
+    result = Result(records=[{"a": 1, "b": "x"}, {"a": 2, "b": "y"}])
+    test = {
+        "expected_columns": ["a", "b"],
+        "expected_rows": [[1, "x"], [2, "y"]],
+    }
+    assert _validate_result(result, test) is True
+
+
+def test_validate_result_dict_records_vs_list_expected_rows_mismatch():
+    """Validation fails when values don't match even with format conversion."""
+    result = Result(records=[{"name": "Bob"}])
+    test = {
+        "expected_columns": ["name"],
+        "expected_rows": [["Alice"]],
+    }
+    assert _validate_result(result, test) is False
+
+
 # --- _parse_pass_rate ---
 
 
@@ -396,3 +431,32 @@ def test_cache_empty_clauses_rejected(tmp_path, monkeypatch):
     save_compliance_cache(config, features)
     loaded = load_cached_compliance(config, ttl_seconds=3600)
     assert loaded is None
+
+
+def test_cache_empty_string_clauses_rejected(tmp_path, monkeypatch):
+    """Cache with empty-string clause names is rejected as stale."""
+    monkeypatch.setattr("graph_db_comparison.compatibility.CACHE_DIR", tmp_path)
+    config = DatabaseConfig(name="fdb", adapter="falkordblite", enabled=True, db_path="/tmp/fdb")
+    # Simulate a cache with "" in clauses (from wrong key extraction)
+    features = FeatureSupportMap(clauses={""}, functions={""}, pass_rate=0.16)
+    save_compliance_cache(config, features)
+    loaded = load_cached_compliance(config, ttl_seconds=3600)
+    assert loaded is None
+
+
+def test_build_feature_map_from_tests_uses_name_key():
+    """Feature map builder extracts feature name from 'name' key (catalog format)."""
+    passed = [
+        {"name": "MATCH", "type": "clause"},
+        {"name": "count", "type": "function"},
+        {"name": "+", "type": "operator"},
+        {"name": "Integer", "type": "data_type"},
+    ]
+    fm = _build_feature_map_from_tests(passed, [], passed)
+    assert "MATCH" in fm.clauses
+    assert "count" in fm.functions
+    assert "+" in fm.operators
+    assert "Integer" in fm.data_types
+    # Empty strings should never appear
+    assert "" not in fm.clauses
+    assert "" not in fm.functions

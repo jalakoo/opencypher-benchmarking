@@ -19,265 +19,364 @@ h3 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; }
 .badge.server { background: #e3f2fd; color: #1565c0; }
 .badge.embedded { background: #f3e5f5; color: #7b1fa2; }
 .badge.winner { background: #c8e6c9; color: #2e7d32; }
-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.85rem; }
-th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
-th { background: #f1f3f5; cursor: pointer; user-select: none; white-space: nowrap; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { background: #f1f3f5; cursor: pointer; user-select: none; }
 th:hover { background: #e9ecef; }
 .pass { color: var(--green); font-weight: 600; }
 .skip { color: var(--grey); }
 .error { color: var(--red); font-weight: 600; }
 .fastest { background: #e8f5e9; }
 .slowest { background: #ffebee; }
-.check { color: var(--green); }
-.cross { color: var(--red); }
 details { margin: 0.5rem 0; }
 summary { cursor: pointer; font-weight: 600; padding: 0.5rem; background: #f1f3f5; border-radius: 4px; }
 summary:hover { background: #e9ecef; }
 .bar-chart { margin: 1rem 0; }
 .narrative { font-size: 1rem; line-height: 1.8; margin: 1rem 0; }
 pre { background: #f1f3f5; padding: 1rem; border-radius: 4px; overflow-x: auto; font-size: 0.8rem; }
-.radar-container { text-align: center; margin: 1.5rem 0; }
+
+/* Scorecard grid */
+.scorecard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.scorecard { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; text-align: center; transition: box-shadow 0.2s; }
+.scorecard:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.scorecard .rank { font-size: 2rem; font-weight: 700; color: var(--blue); }
+.scorecard .db-name { font-size: 1.1rem; font-weight: 600; margin: 0.25rem 0; }
+.scorecard .metric { font-size: 0.85rem; color: var(--muted); margin: 0.15rem 0; }
+.scorecard .metric strong { color: var(--text); }
+.scorecard.rank-1 { border-color: var(--green); border-width: 2px; }
+
+/* Tab navigation */
+.tab-bar { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin: 2rem 0 0; }
+.tab-btn { padding: 0.6rem 1.2rem; border: none; background: none; font-size: 0.95rem; font-weight: 500; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.2s, border-color 0.2s; }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+.tab-panel { display: none; padding-top: 1rem; }
+.tab-panel.active { display: block; }
 </style>
 </head>
 <body>
 
 <h1>Graph Database Performance Comparison</h1>
-<div class="meta">Generated: {{ timestamp }} | Version: {{ version }}</div>
+<div class="meta">Generated: {{ timestamp }} | Version: {{ version }}{% if duration_seconds is defined and duration_seconds is not none %} | Benchmark duration: {{ (duration_seconds // 60)|int }}m {{ (duration_seconds % 60)|int }}s{% endif %}</div>
 
-<!-- Executive Summary -->
-<h2>Executive Summary</h2>
-<div class="card">
-  <p class="narrative">{{ narrative }}</p>
-
-  {% if tier_winners %}
-  <h3>Tier Winners</h3>
-  {% for tier, db in tier_winners.items() %}
-    <span class="badge winner">{{ tier }}: {{ db }}</span>
-  {% endfor %}
-  {% endif %}
-
-  <div class="callout info">
-    <strong>Embedded vs. Server:</strong> Embedded databases run in-process with zero network overhead.
-    Direct latency comparisons between [server] and [embedded] databases should be interpreted with this context.
-  </div>
-
-  {% if radar_svg %}
-  <div class="radar-container">
-    <h3>Multi-Dimensional Comparison</h3>
-    {{ radar_svg }}
-  </div>
-  {% endif %}
-</div>
-
-<!-- Compliance Matrix -->
-<h2>Compliance Matrix</h2>
-<div class="card">
-  {% if compliance_matrix %}
-  <table id="compliance-table">
-    <thead>
-      <tr>
-        <th onclick="sortTable('compliance-table', 0)">Feature</th>
-        {% for db in databases %}
-        <th>{{ db.name }} <span class="badge {{ db.mode }}">{{ db.mode }}</span></th>
-        {% endfor %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in compliance_matrix %}
-      <tr>
-        <td>{{ row.feature }}</td>
-        {% for db in databases %}
-        <td>{% if row.get(db.name) %}<span class="check">&#10003;</span>{% else %}<span class="cross">&#10007;</span>{% endif %}</td>
-        {% endfor %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p>No compliance data available.</p>
-  {% endif %}
-</div>
-
-<!-- Warm vs Cold -->
-<h2>Warm vs. Cold Comparison</h2>
-<div class="card">
-  {% if warm_vs_cold %}
-  <table id="warm-cold-table">
-    <thead>
-      <tr>
-        <th onclick="sortTable('warm-cold-table', 0)">Database</th>
-        <th onclick="sortTable('warm-cold-table', 1)">Benchmark</th>
-        <th onclick="sortTable('warm-cold-table', 2)">Cold (ms)</th>
-        <th onclick="sortTable('warm-cold-table', 3)">Warm Median (ms)</th>
-        <th onclick="sortTable('warm-cold-table', 4)">Cold/Warm Ratio</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for entry in warm_vs_cold %}
-      <tr>
-        <td>{{ entry.database }}</td>
-        <td>{{ entry.benchmark }}</td>
-        <td>{{ "%.2f"|format(entry.cold_ns / 1000000) }}</td>
-        <td>{{ "%.2f"|format(entry.warm_median_ns / 1000000) }}</td>
-        <td>{{ entry.ratio }}x</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p>No warm/cold comparison data available.</p>
-  {% endif %}
-</div>
-
-<!-- Benchmark Results by Tier -->
-<h2>Benchmark Results by Tier</h2>
-{% for tier, rows in tier_tables.items() %}
-<div class="card">
-  <h3>{{ tier|capitalize }} Tier
-    {% if tier_winners.get(tier) %}<span class="badge winner">Winner: {{ tier_winners[tier] }}</span>{% endif %}
-  </h3>
-  <table id="tier-{{ tier }}">
-    <thead>
-      <tr>
-        <th onclick="sortTable('tier-{{ tier }}', 0)">Benchmark</th>
-        <th>Category</th>
-        {% for db in databases %}
-        <th onclick="sortTable('tier-{{ tier }}', {{ loop.index0 * 2 + 2 }})">{{ db.name }} <span class="badge {{ db.mode }}">{{ db.mode }}</span> Median (ms)</th>
-        <th>Status</th>
-        {% endfor %}
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in rows %}
-      <tr>
-        <td>{{ row.benchmark }}</td>
-        <td>{{ row.category }}</td>
-        {% for db in databases %}
-          {% set median_key = db.name ~ "_median" %}
-          {% set status_key = db.name ~ "_status" %}
-          {% set median = row.get(median_key) %}
-          {% set status = row.get(status_key, "—") %}
-          <td>{% if median is not none %}{{ "%.2f"|format(median / 1000000) }}{% else %}—{% endif %}</td>
-          <td class="{{ status }}">{{ status }}</td>
-        {% endfor %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <!-- Bar chart -->
-  {% set chart_rows = [] %}
-  {% for row in rows %}
-    {% for db in databases %}
-      {% set median_key = db.name ~ "_median" %}
-      {% if row.get(median_key) is not none %}
-        {% set _ = chart_rows.append({"db": db.name, "bench": row.benchmark, "val": row[median_key]}) %}
-      {% endif %}
-    {% endfor %}
-  {% endfor %}
-  {% if chart_rows %}
-    {% set max_val = chart_rows|map(attribute='val')|max %}
-    <div class="bar-chart">
-    <svg width="100%" height="{{ chart_rows|length * 28 + 20 }}" viewBox="0 0 600 {{ chart_rows|length * 28 + 20 }}">
-      {% for item in chart_rows %}
-        {% set bar_w = (item.val / max_val * 400) if max_val > 0 else 0 %}
-        {% set color = db_colors.get(item.db, "#999") %}
-        <rect x="150" y="{{ loop.index0 * 28 + 5 }}" width="{{ bar_w|round(0) }}" height="20" fill="{{ color }}" rx="3"/>
-        <text x="145" y="{{ loop.index0 * 28 + 19 }}" text-anchor="end" font-size="10" fill="#333">{{ item.db }}/{{ item.bench }}</text>
-        <text x="{{ 155 + bar_w|round(0) }}" y="{{ loop.index0 * 28 + 19 }}" font-size="10" fill="#666">{{ "%.2f"|format(item.val / 1000000) }}ms</text>
-      {% endfor %}
-    </svg>
-    </div>
-  {% endif %}
-</div>
-{% endfor %}
-
-<!-- Read vs Write Breakdown -->
-<h2>Read vs Write Breakdown</h2>
-<div class="card">
-  {% for category in ["read", "write", "mixed"] %}
-    {% if read_write.get(category) %}
-    <h3>{{ category|capitalize }} Operations</h3>
-    <table>
-      <thead><tr><th>Database</th><th>Mode</th><th>Benchmark</th><th>Median (ms)</th><th>P95 (ms)</th></tr></thead>
-      <tbody>
-      {% for entry in read_write[category] %}
-        <tr>
-          <td>{{ entry.database }}</td>
-          <td><span class="badge {{ entry.mode }}">{{ entry.mode }}</span></td>
-          <td>{{ entry.benchmark }}</td>
-          <td>{% if entry.median_ns is not none %}{{ "%.2f"|format(entry.median_ns / 1000000) }}{% else %}—{% endif %}</td>
-          <td>{% if entry.p95_ns is not none %}{{ "%.2f"|format(entry.p95_ns / 1000000) }}{% else %}—{% endif %}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+<!-- Scorecard Grid -->
+<div class="scorecard-grid">
+  {% for card in scorecards %}
+  <div class="scorecard{% if card.rank == 1 %} rank-1{% endif %}">
+    <div class="rank">#{{ card.rank }}</div>
+    <div class="db-name">{{ card.name }}</div>
+    <span class="badge {{ card.mode }}">{{ card.mode }}</span>
+    <div class="metric"><strong>{{ card.avg_median_ms if card.avg_median_ms is not none else "—" }} ms</strong> avg median</div>
+    <div class="metric">{{ card.benchmarks_passed }}/{{ card.benchmarks_total }} benchmarks passed</div>
+    {% if card.best_tier %}<div class="metric">Best tier: {{ card.best_tier }}</div>{% endif %}
+    {% if card.winner_tiers %}
+      {% for t in card.winner_tiers %}<span class="badge winner">{{ t }} winner</span> {% endfor %}
     {% endif %}
+  </div>
   {% endfor %}
 </div>
 
-<!-- Detailed Results -->
-<h2>Detailed Results</h2>
-<div class="card">
-  {% for db in databases %}
-  <details>
-    <summary>{{ db.name }} <span class="badge {{ db.mode }}">{{ db.mode }}</span></summary>
+<p class="narrative">{{ narrative }}</p>
+
+<div class="callout info">
+  <strong>Embedded vs. Server:</strong> Embedded databases run in-process with zero network overhead.
+  Direct latency comparisons between server and embedded databases should be interpreted with this context.
+</div>
+
+<!-- Tab Navigation -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('dataset')">Dataset</button>
+  <button class="tab-btn" onclick="switchTab('performance')">Performance</button>
+  <button class="tab-btn" onclick="switchTab('coldwarm')">Cold vs Warm</button>
+  <button class="tab-btn" onclick="switchTab('details')">Detailed Results</button>
+  <button class="tab-btn" onclick="switchTab('environment')">Environment</button>
+  <button class="tab-btn" onclick="switchTab('limitations')">Limitations</button>
+</div>
+
+<!-- Tab: Dataset -->
+<div id="tab-dataset" class="tab-panel active">
+  <h2>Dataset Profile</h2>
+  {% if dataset_profile %}
+  <div class="card">
+    <h3>Generated Test Data <span class="badge server">scale: {{ dataset_profile.scale }}x</span></h3>
+    <p style="font-size: 0.9rem; color: var(--muted); margin-bottom: 0.75rem;">
+      The following synthetic datasets were generated and loaded into each database for this benchmarking run.
+      Each benchmark creates its data independently per database using deterministic generation (seed 42), ensuring identical logical datasets across all databases tested.
+    </p>
+    <div class="table-wrap">
     <table>
-      <thead><tr><th>Benchmark</th><th>Tier</th><th>Status</th><th>Median (ms)</th><th>Min (ms)</th><th>Max (ms)</th><th>Std Dev (ms)</th><th>Iterations</th></tr></thead>
+      <thead>
+        <tr><th>Tier</th><th>Persons</th><th>Companies</th><th>KNOWS edges</th><th>WORKS_AT edges</th></tr>
+      </thead>
       <tbody>
-      {% for r in detail_results.get(db.name, []) %}
+        {% for tier_name in ["basic", "intermediate", "advanced"] %}
+        {% if dataset_profile.tiers.get(tier_name) %}
+        {% set t = dataset_profile.tiers[tier_name] %}
         <tr>
-          <td>{{ r.benchmark }}</td>
-          <td>{{ r.tier }}</td>
-          <td class="{{ r.status }}">{{ r.status }}{% if r.skipped_reason %}: {{ r.skipped_reason }}{% endif %}</td>
-          <td>{% if r.median_ns is not none %}{{ "%.2f"|format(r.median_ns / 1000000) }}{% else %}—{% endif %}</td>
-          <td>{% if r.min_ns is not none %}{{ "%.2f"|format(r.min_ns / 1000000) }}{% else %}—{% endif %}</td>
-          <td>{% if r.max_ns is not none %}{{ "%.2f"|format(r.max_ns / 1000000) }}{% else %}—{% endif %}</td>
-          <td>{% if r.std_dev_ns is not none %}{{ "%.2f"|format(r.std_dev_ns / 1000000) }}{% else %}—{% endif %}</td>
-          <td>{{ r.iterations }}</td>
+          <td>{{ tier_name|capitalize }}</td>
+          <td>{{ "{:,}".format(t.persons) }}</td>
+          <td>{{ "{:,}".format(t.companies) if t.companies is defined else "—" }}</td>
+          <td>{{ "{:,}".format(t.knows_edges) if t.knows_edges is defined else "—" }}</td>
+          <td>{{ "{:,}".format(t.works_at_edges) if t.works_at_edges is defined else "—" }}</td>
         </tr>
-      {% endfor %}
+        {% endif %}
+        {% endfor %}
       </tbody>
     </table>
-  </details>
-  {% endfor %}
-</div>
-
-<!-- Skipped Benchmarks -->
-<h2>Skipped Benchmarks</h2>
-<div class="card">
-  {% if skipped %}
-  <table id="skipped-table">
-    <thead>
-      <tr>
-        <th onclick="sortTable('skipped-table', 0)">Database</th>
-        <th onclick="sortTable('skipped-table', 1)">Benchmark</th>
-        <th>Reason</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for s in skipped %}
-      <tr>
-        <td>{{ s.database }}</td>
-        <td>{{ s.benchmark }}</td>
-        <td>{{ s.reason }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    </div>
+  </div>
   {% else %}
-  <p>No benchmarks were skipped.</p>
+  <div class="card"><p>No dataset profile available.</p></div>
   {% endif %}
 </div>
 
-<!-- Environment Info -->
-<h2>Environment Info</h2>
-<div class="card">
-  <pre>{{ config_redacted | tojson(indent=2) }}</pre>
+<!-- Tab: Performance -->
+<div id="tab-performance" class="tab-panel">
+  <h2>Benchmark Results by Tier</h2>
+  {% for tier, rows in tier_tables.items() %}
+  <div class="card">
+    <h3>{{ tier|capitalize }} Tier
+      {% if tier_winners.get(tier) %}<span class="badge winner">Winner: {{ tier_winners[tier] }}</span>{% endif %}
+    </h3>
+    <div class="table-wrap">
+    <table id="tier-{{ tier }}">
+      <thead>
+        <tr>
+          <th onclick="sortTable('tier-{{ tier }}', 0)">Benchmark</th>
+          <th>Category</th>
+          {% for db in databases %}
+          <th onclick="sortTable('tier-{{ tier }}', {{ loop.index0 * 2 + 2 }})">{{ db.name }} <span class="badge {{ db.mode }}">{{ db.mode }}</span> Median (ms)</th>
+          <th>Status</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>{{ row.benchmark }}</td>
+          <td>{{ row.category }}</td>
+          {% for db in databases %}
+            {% set median_key = db.name ~ "_median" %}
+            {% set status_key = db.name ~ "_status" %}
+            {% set median = row.get(median_key) %}
+            {% set status = row.get(status_key, "—") %}
+            <td>{% if median is not none %}{{ "%.2f"|format(median / 1000000) }}{% else %}—{% endif %}</td>
+            <td class="{{ status }}">{{ status }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+
+    <!-- Bar chart (collapsed by default) -->
+    {% set chart_rows = [] %}
+    {% for row in rows %}
+      {% for db in databases %}
+        {% set median_key = db.name ~ "_median" %}
+        {% if row.get(median_key) is not none %}
+          {% set _ = chart_rows.append({"db": db.name, "bench": row.benchmark, "val": row[median_key]}) %}
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+    {% if chart_rows %}
+    <details>
+      <summary>Show bar chart</summary>
+      {% set max_val = chart_rows|map(attribute='val')|max %}
+      <div class="bar-chart">
+      <svg width="100%" height="{{ chart_rows|length * 28 + 20 }}" viewBox="0 0 600 {{ chart_rows|length * 28 + 20 }}">
+        {% for item in chart_rows %}
+          {% set bar_w = (item.val / max_val * 400) if max_val > 0 else 0 %}
+          {% set color = db_colors.get(item.db, "#999") %}
+          <rect x="150" y="{{ loop.index0 * 28 + 5 }}" width="{{ bar_w|round(0) }}" height="20" fill="{{ color }}" rx="3"/>
+          <text x="145" y="{{ loop.index0 * 28 + 19 }}" text-anchor="end" font-size="10" fill="#333">{{ item.db }}/{{ item.bench }}</text>
+          <text x="{{ 155 + bar_w|round(0) }}" y="{{ loop.index0 * 28 + 19 }}" font-size="10" fill="#666">{{ "%.2f"|format(item.val / 1000000) }}ms</text>
+        {% endfor %}
+      </svg>
+      </div>
+    </details>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <!-- Skipped Benchmarks -->
+  {% if skipped %}
+  <div class="card">
+    <h3>Skipped Benchmarks</h3>
+    <div class="table-wrap">
+    <table id="skipped-table">
+      <thead>
+        <tr>
+          <th onclick="sortTable('skipped-table', 0)">Database</th>
+          <th onclick="sortTable('skipped-table', 1)">Benchmark</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in skipped %}
+        <tr>
+          <td>{{ s.database }}</td>
+          <td>{{ s.benchmark }}</td>
+          <td>{{ s.reason }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
 </div>
 
-<!-- Inline JS: table sorting -->
+<!-- Tab: Cold vs Warm -->
+<div id="tab-coldwarm" class="tab-panel">
+  <h2>Cold vs Warm Analysis</h2>
+
+  {% if cold_warm_summary %}
+  <div class="card">
+    <h3>Summary</h3>
+    <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Database</th><th>Avg Cold/Warm Ratio</th><th>Max Ratio</th><th>Worst Benchmark</th></tr>
+      </thead>
+      <tbody>
+        {% for row in cold_warm_summary %}
+        <tr>
+          <td>{{ row.name }}</td>
+          <td>{{ row.avg_ratio }}x</td>
+          <td>{{ row.max_ratio }}x</td>
+          <td>{{ row.worst_benchmark }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if warm_vs_cold %}
+  <div class="card">
+    <details>
+      <summary>Show all benchmark-level rows ({{ warm_vs_cold|length }})</summary>
+      <div class="table-wrap">
+      <table id="warm-cold-table">
+        <thead>
+          <tr>
+            <th onclick="sortTable('warm-cold-table', 0)">Database</th>
+            <th onclick="sortTable('warm-cold-table', 1)">Benchmark</th>
+            <th onclick="sortTable('warm-cold-table', 2)">Cold (ms)</th>
+            <th onclick="sortTable('warm-cold-table', 3)">Warm Median (ms)</th>
+            <th onclick="sortTable('warm-cold-table', 4)">Cold/Warm Ratio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in warm_vs_cold %}
+          <tr>
+            <td>{{ entry.database }}</td>
+            <td>{{ entry.benchmark }}</td>
+            <td>{{ "%.2f"|format(entry.cold_ns / 1000000) }}</td>
+            <td>{{ "%.2f"|format(entry.warm_median_ns / 1000000) }}</td>
+            <td>{{ entry.ratio }}x</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </details>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Tab: Detailed Results -->
+<div id="tab-details" class="tab-panel">
+  <h2>Detailed Results</h2>
+  <div class="card">
+    {% for db in databases %}
+    <details>
+      <summary>{{ db.name }} <span class="badge {{ db.mode }}">{{ db.mode }}</span></summary>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>Benchmark</th><th>Tier</th><th>Status</th><th>Median (ms)</th><th>Min (ms)</th><th>Max (ms)</th><th>Std Dev (ms)</th><th>Iterations</th></tr></thead>
+        <tbody>
+        {% for r in detail_results.get(db.name, []) %}
+          <tr>
+            <td>{{ r.benchmark }}</td>
+            <td>{{ r.tier }}</td>
+            <td class="{{ r.status }}">{{ r.status }}{% if r.skipped_reason %}: {{ r.skipped_reason }}{% endif %}</td>
+            <td>{% if r.median_ns is not none %}{{ "%.2f"|format(r.median_ns / 1000000) }}{% else %}—{% endif %}</td>
+            <td>{% if r.min_ns is not none %}{{ "%.2f"|format(r.min_ns / 1000000) }}{% else %}—{% endif %}</td>
+            <td>{% if r.max_ns is not none %}{{ "%.2f"|format(r.max_ns / 1000000) }}{% else %}—{% endif %}</td>
+            <td>{% if r.std_dev_ns is not none %}{{ "%.2f"|format(r.std_dev_ns / 1000000) }}{% else %}—{% endif %}</td>
+            <td>{{ r.iterations }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </details>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Tab: Environment -->
+<div id="tab-environment" class="tab-panel">
+  <h2>Environment Info</h2>
+  <div class="card">
+    <pre>{{ config_redacted | tojson(indent=2) }}</pre>
+  </div>
+</div>
+
+<!-- Tab: Limitations -->
+<div id="tab-limitations" class="tab-panel">
+  <h2>Limitations</h2>
+
+  <div class="card">
+    <h3>What This Benchmark Measures</h3>
+    <ul style="margin: 0.5rem 0 0 1.5rem; font-size: 0.9rem; line-height: 1.8;">
+      <li><strong>Single-client query latency</strong> for a fixed set of openCypher operations (CREATE, MATCH, MERGE, shortestPath, aggregations, etc.)</li>
+      <li><strong>Cold vs. warm execution time</strong> to reveal caching and JIT compilation effects</li>
+      <li><strong>Feature coverage</strong> — which Cypher clauses, functions, and operators each database supports</li>
+      <li><strong>Relative performance</strong> between databases on identical synthetic datasets at a single scale factor</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>Caveats</h3>
+    <ul style="margin: 0.5rem 0 0 1.5rem; font-size: 0.9rem; line-height: 1.8;">
+      <li><strong>Synthetic data only.</strong> The generated social-graph dataset (persons, companies, KNOWS/WORKS_AT edges) does not reflect real-world data distributions, skew, or cardinality patterns.</li>
+      <li><strong>Small scale.</strong> Default dataset sizes (1K–5K nodes, 5K–25K edges) are far below production graph sizes. Performance characteristics can change dramatically at millions of nodes/edges.</li>
+      <li><strong>Single client, no concurrency.</strong> All benchmarks (except <code>concurrent_writes</code>) run from a single thread. This does not measure throughput under concurrent load.</li>
+      <li><strong>No index tuning.</strong> Benchmarks use minimal indexing. Production deployments with proper indexes, constraints, and query hints will perform differently.</li>
+      <li><strong>Network vs. embedded.</strong> Server-mode databases include network round-trip latency; embedded databases do not. The report tags each mode, but direct cross-mode comparisons are not apples-to-apples.</li>
+      <li><strong>No durability or recovery testing.</strong> Write benchmarks do not measure fsync, WAL, replication, or crash-recovery behavior.</li>
+      <li><strong>openCypher subset.</strong> Only features detectable by the opencypher-compliance package are tested. Proprietary extensions (e.g., Neo4j APOC, Memgraph MAGE) are not exercised.</li>
+      <li><strong>Environment-dependent.</strong> Results depend on hardware, OS, Docker resource limits, and background load. They are not transferable across machines without re-running.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>What This Benchmark Should Not Be Used For</h3>
+    <ul style="margin: 0.5rem 0 0 1.5rem; font-size: 0.9rem; line-height: 1.8;">
+      <li><strong>Production workload sizing.</strong> These results cannot predict throughput, P99 latencies, or resource consumption for your specific data model and query mix.</li>
+      <li><strong>High-concurrency or multi-tenant performance.</strong> The benchmarks do not simulate connection pooling, concurrent readers/writers, or tenant isolation.</li>
+      <li><strong>Operational readiness.</strong> Backup/restore speed, monitoring integration, cluster failover, rolling upgrades, and operational maturity are not evaluated.</li>
+      <li><strong>Cost analysis.</strong> Licensing costs, cloud instance pricing, and total cost of ownership are out of scope.</li>
+      <li><strong>Query optimizer quality at scale.</strong> With small datasets, most queries complete via sequential scans. Optimizer differences only emerge with larger graphs and more complex access patterns.</li>
+      <li><strong>Graph analytics or GDS workloads.</strong> PageRank, community detection, centrality, and other graph-algorithm workloads are not included.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Inline JS: tab switching + table sorting -->
 <script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
 function sortTable(tableId, colIdx) {
   const table = document.getElementById(tableId);
   if (!table) return;

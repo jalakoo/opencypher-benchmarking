@@ -11,6 +11,7 @@ A Python-based benchmarking tool that compares six graph databases using openCyp
 - [Configuration Reference](#configuration-reference)
 - [Database Categories](#database-categories)
 - [Benchmark Descriptions](#benchmark-descriptions)
+- [Test Datasets](#test-datasets)
 - [Warm vs Cold Benchmarking](#warm-vs-cold-benchmarking)
 - [CLI Reference](#cli-reference)
 - [Report Guide](#report-guide)
@@ -77,6 +78,9 @@ The easiest way is `run_bench.sh`, which auto-creates a virtual environment and 
 
 # Compliance only (no benchmarks)
 ./run_bench.sh -c config.yaml --compliance-only
+
+# Regenerate HTML report from existing results (no benchmarks rerun)
+./run_bench.sh --from-json reports/results.json
 ```
 
 All arguments are forwarded to `graph-db-bench`. If you prefer to manage the environment yourself:
@@ -84,6 +88,9 @@ All arguments are forwarded to `graph-db-bench`. If you prefer to manage the env
 ```bash
 pip install -e ".[all]"       # or: .[server], .[embedded]
 graph-db-bench -c config.yaml -v
+
+# Regenerate HTML from existing JSON results
+graph-db-bench --from-json reports/results.json
 ```
 
 ### 4. View report
@@ -200,6 +207,42 @@ Complex queries simulating real-world analytical and transactional patterns.
 | `temporal_queries` | read | Filter and sort by date properties |
 | `write_throughput` | write | Sustained sequential writes (ops/sec) |
 
+## Test Datasets
+
+Each benchmark generates its own synthetic data via deterministic random seeds, so results are reproducible across runs. Data is generated independently per database — there is no shared pre-loaded dataset. Each benchmark follows a **setup → run → teardown** cycle: setup inserts data, timed iterations execute queries against it, and teardown deletes it. Between tiers, the entire graph is wiped with `MATCH (n) DETACH DELETE n`.
+
+### Node Types
+
+| Node Label | Properties | Count per scale unit |
+|---|---|---|
+| Person | `name`, `age` (18–80), `city` (8 cities), `active` (bool), `created` (date) | 1,000 |
+| Company | `name`, `industry` (6 industries), `founded` (1950–2025) | 50 |
+
+### Relationship Types
+
+| Relationship | From → To | Count per scale unit | Notes |
+|---|---|---|---|
+| KNOWS | Person → Person | 5,000 | No self-loops, unique edges |
+| WORKS_AT | Person → Company | 1,000 | Random pairing |
+
+### Dataset Scale by Tier
+
+The `dataset_scale` config option (default: 1) multiplies all counts. The advanced tier additionally applies a 5x multiplier on top of the configured scale.
+
+| Tier | Scale multiplier | Persons | Companies | KNOWS edges | WORKS_AT edges |
+|---|---|---|---|---|---|
+| Basic | 1x | 1,000 | — | — | — |
+| Intermediate | 1x | 1,000 | 50 | 5,000 | 1,000 |
+| Advanced | 5x | 5,000 | 250 | 25,000 | 5,000 |
+
+### Label Prefixes
+
+Each tier uses a unique label prefix to avoid collisions between tiers: `_basic_`, `_inter_`, `_adv_`. For example, basic tier Person nodes are labeled `_basic_Person`.
+
+### Deterministic Generation
+
+All data generators use a fixed random seed (`seed=42`, with offsets per generator). This means every database receives the same logical dataset for each benchmark, enabling fair comparison despite data being inserted independently.
+
 ## Warm vs Cold Benchmarking
 
 Every benchmark runs both a **cold** variant (first execution, no cache warmup) and a **warm** variant (after warmup iterations). The report includes a dedicated comparison section showing the cold/warm ratio for each benchmark.
@@ -221,6 +264,7 @@ Options:
   --force-compliance          Force fresh compliance run, ignoring cache
   --compliance-ttl SECONDS    Compliance cache TTL [default: 86400]
   --check                     Ping databases and report status, then exit
+  --from-json PATH            Regenerate HTML report from existing results.json, then exit
   --no-report                 Skip HTML report, output JSON only
   --output-dir PATH           Output directory [default: ./reports]
   -v, --verbose               Verbose logging

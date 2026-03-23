@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -26,7 +27,11 @@ from graph_db_comparison.models import (
     FeatureSupportMap,
     FullReport,
 )
-from graph_db_comparison.report.generator import generate_html_report, generate_json_report
+from graph_db_comparison.report.generator import (
+    generate_html_report,
+    generate_json_report,
+    load_report_from_json,
+)
 
 logger = logging.getLogger("graph_db_comparison")
 
@@ -105,6 +110,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--check",
         action="store_true",
         help="Ping all enabled databases and report status, then exit.",
+    )
+    parser.add_argument(
+        "--from-json",
+        help="Regenerate HTML report from an existing results.json file, then exit.",
     )
     parser.add_argument(
         "--no-report",
@@ -266,6 +275,16 @@ def main() -> None:
         datefmt="%H:%M:%S",
     )
 
+    # Regenerate HTML from existing JSON
+    if args.from_json:
+        report = load_report_from_json(args.from_json)
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        html_path = output_dir / "report.html"
+        generate_html_report(report, str(html_path))
+        logger.info(f"HTML report: {html_path}")
+        return
+
     # Load config
     try:
         config = load_config(args.config)
@@ -279,7 +298,9 @@ def main() -> None:
         return
 
     # Run benchmarks (or compliance-only)
+    bench_start = time.monotonic()
     report = run_benchmarks(args, config)
+    report.duration_seconds = round(time.monotonic() - bench_start, 1)
 
     # Generate output
     output_dir = Path(args.output_dir)

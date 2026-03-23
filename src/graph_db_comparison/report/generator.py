@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -13,7 +12,13 @@ from jinja2 import Environment, FileSystemLoader
 
 from graph_db_comparison.models import (
     AppConfig,
+    BenchmarkConfig,
+    BenchmarkResult,
+    DatabaseConfig,
+    DatabaseReport,
+    FeatureSupportMap,
     FullReport,
+    OutputConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,12 +58,11 @@ def aggregate_report_data(report: FullReport) -> dict[str, Any]:
     databases = _build_database_summaries(report)
     tier_tables = _build_tier_tables(report)
     tier_winners = _compute_tier_winners(tier_tables)
-    radar_data = _compute_radar_data(report)
-    compliance_matrix = _build_compliance_matrix(report)
     warm_vs_cold = _build_warm_vs_cold(report)
+    cold_warm_summary = _build_cold_warm_summary(report)
     skipped = _build_skipped_list(report)
-    read_write = _build_read_write_breakdown(report)
     narrative = _build_narrative(tier_winners, report)
+    scorecards = _compute_scorecards(report, tier_winners)
 
     return {
         "timestamp": report.timestamp,
@@ -66,21 +70,18 @@ def aggregate_report_data(report: FullReport) -> dict[str, Any]:
         "databases": databases,
         "tier_tables": tier_tables,
         "tier_winners": tier_winners,
-        "radar_data": radar_data,
-        "compliance_matrix": compliance_matrix,
         "warm_vs_cold": warm_vs_cold,
+        "cold_warm_summary": cold_warm_summary,
         "skipped": skipped,
-        "read_write": read_write,
         "narrative": narrative,
+        "scorecards": scorecards,
+        "duration_seconds": report.duration_seconds,
+        "dataset_profile": _build_dataset_profile(report.config.benchmark.dataset_scale),
         "db_colors": {
             db.name: DB_COLORS[i % len(DB_COLORS)] for i, db in enumerate(report.databases)
         },
         "config_redacted": _redact_config(report.config),
         "detail_results": _build_detail_results(report),
-        "radar_svg": _build_radar_svg(
-            radar_data,
-            {db.name: DB_COLORS[i % len(DB_COLORS)] for i, db in enumerate(report.databases)},
-        ),
     }
 
 
@@ -106,7 +107,124 @@ def generate_json_report(report: FullReport, output_path: str) -> None:
     logger.info(f"JSON report written to {output_path}")
 
 
+def load_report_from_json(json_path: str) -> FullReport:
+    """Load a FullReport from a previously generated results.json."""
+    data = json.loads(Path(json_path).read_text())
+
+    # Rebuild config
+    db_configs = {}
+    for db_name, db_data in data.get("config", {}).get("databases", {}).items():
+        db_configs[db_name] = DatabaseConfig(
+            name=db_data.get("name", db_name),
+            adapter=db_data.get("adapter", "bolt"),
+            enabled=db_data.get("enabled", True),
+            host=db_data.get("host"),
+            port=db_data.get("port"),
+            auth=db_data.get("auth"),
+            db_path=db_data.get("db_path"),
+            graph_name=db_data.get("graph_name", "benchmark"),
+            mode=db_data.get("mode", ""),
+        )
+    bench_cfg = data.get("config", {}).get("benchmark", {})
+    out_cfg = data.get("config", {}).get("output", {})
+    config = AppConfig(
+        databases=db_configs,
+        benchmark=BenchmarkConfig(
+            iterations=bench_cfg.get("iterations", 5),
+            warmup_iterations=bench_cfg.get("warmup_iterations", 2),
+            timeout_seconds=bench_cfg.get("timeout_seconds", 30),
+            dataset_scale=bench_cfg.get("dataset_scale", 1),
+            concurrency=bench_cfg.get("concurrency", 8),
+        ),
+        output=OutputConfig(
+            report_path=out_cfg.get("report_path", "./reports/report.html"),
+            raw_json_path=out_cfg.get("raw_json_path", "./reports/results.json"),
+        ),
+    )
+
+    # Rebuild database reports
+    db_reports = []
+    for db_data in data.get("databases", []):
+        compliance = None
+        if db_data.get("compliance"):
+            c = db_data["compliance"]
+            compliance = FeatureSupportMap(
+                clauses=set(c.get("clauses", [])),
+                functions=set(c.get("functions", [])),
+                operators=set(c.get("operators", [])),
+                data_types=set(c.get("data_types", [])),
+                pass_rate=c.get("pass_rate", 0.0),
+            )
+
+        results = []
+        for r in db_data.get("results", []):
+            results.append(
+                BenchmarkResult(
+                    benchmark_name=r["benchmark_name"],
+                    tier=r["tier"],
+                    category=r["category"],
+                    database_name=r["database_name"],
+                    status=r["status"],
+                    cold_latency_ns=r.get("cold_latency_ns"),
+                    warm_latencies_ns=r.get("warm_latencies_ns", []),
+                    median_ns=r.get("median_ns"),
+                    mean_ns=r.get("mean_ns"),
+                    p95_ns=r.get("p95_ns"),
+                    p99_ns=r.get("p99_ns"),
+                    min_ns=r.get("min_ns"),
+                    max_ns=r.get("max_ns"),
+                    std_dev_ns=r.get("std_dev_ns"),
+                    errors=r.get("errors", []),
+                    skipped_reason=r.get("skipped_reason"),
+                )
+            )
+
+        db_reports.append(
+            DatabaseReport(
+                name=db_data["name"],
+                mode=db_data["mode"],
+                adapter=db_data["adapter"],
+                compliance=compliance,
+                compliance_error=db_data.get("compliance_error"),
+                results=results,
+            )
+        )
+
+    return FullReport(
+        timestamp=data["timestamp"],
+        version=data["version"],
+        config=config,
+        databases=db_reports,
+        duration_seconds=data.get("duration_seconds"),
+    )
+
+
 # --- Internal helpers ---
+
+
+def _build_dataset_profile(scale: int) -> dict[str, Any]:
+    """Compute dataset sizes per tier based on the configured scale."""
+    adv_scale = max(scale * 5, 5)
+    return {
+        "scale": scale,
+        "tiers": {
+            "basic": {
+                "persons": 1000 * scale,
+            },
+            "intermediate": {
+                "persons": 1000 * scale,
+                "companies": 50 * scale,
+                "knows_edges": 5000 * scale,
+                "works_at_edges": 1000 * scale,
+            },
+            "advanced": {
+                "persons": 1000 * adv_scale,
+                "companies": 50 * adv_scale,
+                "knows_edges": 5000 * adv_scale,
+                "works_at_edges": 1000 * adv_scale,
+            },
+        },
+    }
 
 
 def _build_database_summaries(report: FullReport) -> list[dict[str, Any]]:
@@ -120,7 +238,6 @@ def _build_database_summaries(report: FullReport) -> list[dict[str, Any]]:
                 "name": db.name,
                 "mode": db.mode,
                 "adapter": db.adapter,
-                "compliance_pass_rate": db.compliance.pass_rate if db.compliance else None,
                 "benchmarks_passed": passed,
                 "benchmarks_total": total,
             }
@@ -163,93 +280,48 @@ def _compute_tier_winners(tier_tables: dict[str, list[dict]]) -> dict[str, str]:
     return winners
 
 
-def _compute_radar_data(report: FullReport) -> dict[str, dict[str, float]]:
-    """Compute normalized 0-100 radar chart scores for each database."""
-    raw: dict[str, dict[str, float]] = {}
-
+def _compute_scorecards(report: FullReport, tier_winners: dict[str, str]) -> list[dict[str, Any]]:
+    """Compute ranked scorecard data for each database."""
+    cards = []
     for db in report.databases:
-        read_medians = [
-            r.median_ns
-            for r in db.results
-            if r.category == "read" and r.status == "pass" and r.median_ns
-        ]
-        write_medians = [
-            r.median_ns
-            for r in db.results
-            if r.category == "write" and r.status == "pass" and r.median_ns
-        ]
-        total = len(db.results)
         passed = sum(1 for r in db.results if r.status == "pass")
+        total = len(db.results)
+        medians = [r.median_ns for r in db.results if r.status == "pass" and r.median_ns]
+        avg_median_ns = sum(medians) / len(medians) if medians else float("inf")
 
-        raw[db.name] = {
-            "read_latency": (
-                float(sum(read_medians) / len(read_medians)) if read_medians else float("inf")
-            ),
-            "write_latency": (
-                float(sum(write_medians) / len(write_medians)) if write_medians else float("inf")
-            ),
-            "compliance": _safe_pass_rate(db.compliance.pass_rate) if db.compliance else 0.0,
-            "coverage": float(passed / total * 100) if total > 0 else 0.0,
-        }
+        # Find best tier: the tier where this DB has the lowest average median
+        tier_avgs: dict[str, float] = {}
+        for r in db.results:
+            if r.status == "pass" and r.median_ns:
+                tier_avgs.setdefault(r.tier, []).append(r.median_ns)
+        best_tier = None
+        if tier_avgs:
+            best_tier = min(tier_avgs, key=lambda t: sum(tier_avgs[t]) / len(tier_avgs[t]))
 
-    # Normalize: for latency, lower is better (invert); for others, higher is better
-    radar: dict[str, dict[str, float]] = {}
-    axes = ["read_latency", "write_latency", "compliance", "coverage"]
+        # Check if this DB is a tier winner
+        winner_tiers = [t for t, w in tier_winners.items() if w == db.name]
 
-    for axis in axes:
-        values = [
-            raw[db][axis]
-            for db in raw
-            if isinstance(raw[db][axis], (int, float)) and raw[db][axis] != float("inf")
-        ]
-        if not values:
-            for db in raw:
-                radar.setdefault(db, {})[axis] = 0
-            continue
+        cards.append(
+            {
+                "name": db.name,
+                "mode": db.mode,
+                "avg_median_ms": (
+                    round(avg_median_ns / 1_000_000, 2) if avg_median_ns != float("inf") else None
+                ),
+                "benchmarks_passed": passed,
+                "benchmarks_total": total,
+                "best_tier": best_tier,
+                "winner_tiers": winner_tiers,
+                "rank": 0,  # filled below
+            }
+        )
 
-        min_val = min(values)
-        max_val = max(values)
+    # Rank by average median (lower is better)
+    cards.sort(key=lambda c: c["avg_median_ms"] if c["avg_median_ms"] is not None else float("inf"))
+    for i, card in enumerate(cards):
+        card["rank"] = i + 1
 
-        for db in raw:
-            val = raw[db][axis]
-            if val == float("inf"):
-                radar.setdefault(db, {})[axis] = 0
-            elif max_val == min_val:
-                radar.setdefault(db, {})[axis] = 100
-            elif axis in ("read_latency", "write_latency"):
-                # Invert: lower latency = higher score
-                radar.setdefault(db, {})[axis] = round(
-                    (1 - (val - min_val) / (max_val - min_val)) * 100
-                )
-            else:
-                radar.setdefault(db, {})[axis] = round((val - min_val) / (max_val - min_val) * 100)
-
-    return radar
-
-
-def _build_compliance_matrix(report: FullReport) -> list[dict[str, Any]]:
-    """Build compliance feature matrix rows."""
-    all_features: dict[str, dict[str, bool]] = {}
-
-    for db in report.databases:
-        if not db.compliance:
-            continue
-        for clause in db.compliance.clauses:
-            all_features.setdefault(f"clause:{clause}", {})[db.name] = True
-        for func in db.compliance.functions:
-            all_features.setdefault(f"function:{func}", {})[db.name] = True
-        for op in db.compliance.operators:
-            all_features.setdefault(f"operator:{op}", {})[db.name] = True
-
-    db_names = [db.name for db in report.databases]
-    matrix = []
-    for feature, support in sorted(all_features.items()):
-        row: dict[str, Any] = {"feature": feature}
-        for db_name in db_names:
-            row[db_name] = support.get(db_name, False)
-        matrix.append(row)
-
-    return matrix
+    return cards
 
 
 def _build_warm_vs_cold(report: FullReport) -> list[dict[str, Any]]:
@@ -272,6 +344,35 @@ def _build_warm_vs_cold(report: FullReport) -> list[dict[str, Any]]:
     return entries
 
 
+def _build_cold_warm_summary(report: FullReport) -> list[dict[str, Any]]:
+    """Build one-row-per-database cold/warm summary."""
+    summary = []
+    for db in report.databases:
+        ratios = []
+        worst_bench = None
+        worst_ratio = 0.0
+        for r in db.results:
+            if r.status != "pass" or r.cold_latency_ns is None or r.median_ns is None:
+                continue
+            if r.median_ns <= 0:
+                continue
+            ratio = r.cold_latency_ns / r.median_ns
+            ratios.append(ratio)
+            if ratio > worst_ratio:
+                worst_ratio = ratio
+                worst_bench = r.benchmark_name
+        if ratios:
+            summary.append(
+                {
+                    "name": db.name,
+                    "avg_ratio": round(sum(ratios) / len(ratios), 2),
+                    "max_ratio": round(max(ratios), 2),
+                    "worst_benchmark": worst_bench,
+                }
+            )
+    return summary
+
+
 def _build_skipped_list(report: FullReport) -> list[dict[str, str]]:
     """Build list of skipped benchmarks."""
     skipped = []
@@ -288,27 +389,6 @@ def _build_skipped_list(report: FullReport) -> list[dict[str, str]]:
     return skipped
 
 
-def _build_read_write_breakdown(
-    report: FullReport,
-) -> dict[str, list[dict[str, Any]]]:
-    """Split results into read and write tables."""
-    breakdown: dict[str, list[dict[str, Any]]] = {"read": [], "write": [], "mixed": []}
-    for db in report.databases:
-        for r in db.results:
-            if r.status != "pass":
-                continue
-            breakdown.setdefault(r.category, []).append(
-                {
-                    "database": db.name,
-                    "mode": db.mode,
-                    "benchmark": r.benchmark_name,
-                    "median_ns": r.median_ns,
-                    "p95_ns": r.p95_ns,
-                }
-            )
-    return breakdown
-
-
 def _build_narrative(winners: dict[str, str], report: FullReport) -> str:
     """Generate plain-English executive summary narrative."""
     parts = []
@@ -317,15 +397,6 @@ def _build_narrative(winners: dict[str, str], report: FullReport) -> str:
         for tier, db in sorted(winners.items()):
             mode = next((d.mode for d in report.databases if d.name == db), "unknown")
             parts.append(f"{db} [{mode}] led in the {tier} tier")
-
-    compliance_leader = None
-    best_rate = 0.0
-    for db in report.databases:
-        if db.compliance and db.compliance.pass_rate > best_rate:
-            best_rate = db.compliance.pass_rate
-            compliance_leader = db.name
-    if compliance_leader:
-        parts.append(f"{compliance_leader} had the highest Cypher compliance ({best_rate:.0%})")
 
     embedded = [db.name for db in report.databases if db.mode == "embedded"]
     if embedded:
@@ -369,69 +440,6 @@ def _build_detail_results(report: FullReport) -> dict[str, list[dict[str, Any]]]
             )
         details[db.name] = rows
     return details
-
-
-def _build_radar_svg(radar_data: dict[str, dict[str, float]], colors: dict[str, str]) -> str:
-    """Pre-compute radar chart SVG string."""
-    if not radar_data:
-        return ""
-
-    axes = ["read_latency", "write_latency", "compliance", "coverage"]
-    labels = ["Read Perf", "Write Perf", "Compliance", "Coverage"]
-    n = len(axes)
-    radius = 180
-
-    lines = ['<svg width="500" height="420" viewBox="-260 -210 520 420">']
-
-    # Grid levels
-    for level in [20, 40, 60, 80, 100]:
-        points = []
-        for i in range(n):
-            angle = -math.pi / 2 + (2 * math.pi / n) * i
-            x = round(level * 1.8 * math.cos(angle), 1)
-            y = round(level * 1.8 * math.sin(angle), 1)
-            points.append(f"{x},{y}")
-        lines.append(
-            f'  <polygon points="{" ".join(points)}" fill="none" stroke="#ddd" stroke-width="1"/>'
-        )
-
-    # Axis lines and labels
-    for i in range(n):
-        angle = -math.pi / 2 + (2 * math.pi / n) * i
-        x = round(radius * math.cos(angle), 1)
-        y = round(radius * math.sin(angle), 1)
-        lx = round(200 * math.cos(angle), 1)
-        ly = round(200 * math.sin(angle), 1)
-        lines.append(f'  <line x1="0" y1="0" x2="{x}" y2="{y}" stroke="#ddd" stroke-width="1"/>')
-        lines.append(
-            f'  <text x="{lx}" y="{ly}" text-anchor="middle" font-size="12" '
-            f'fill="#666">{labels[i]}</text>'
-        )
-
-    # Database polygons
-    for db_name, scores in radar_data.items():
-        color = colors.get(db_name, "#999")
-        points = []
-        for i, axis in enumerate(axes):
-            val = scores.get(axis, 0)
-            angle = -math.pi / 2 + (2 * math.pi / n) * i
-            x = round(val * 1.8 * math.cos(angle), 1)
-            y = round(val * 1.8 * math.sin(angle), 1)
-            points.append(f"{x},{y}")
-        lines.append(
-            f'  <polygon points="{" ".join(points)}" '
-            f'fill="{color}" fill-opacity="0.2" stroke="{color}" stroke-width="2"/>'
-        )
-
-    # Legend
-    for i, db_name in enumerate(radar_data):
-        color = colors.get(db_name, "#999")
-        ly = 140 + i * 20
-        lines.append(f'  <rect x="-240" y="{ly}" width="12" height="12" fill="{color}"/>')
-        lines.append(f'  <text x="-224" y="{ly + 11}" font-size="11" fill="#333">{db_name}</text>')
-
-    lines.append("</svg>")
-    return "\n".join(lines)
 
 
 def _serialize_report(report: FullReport) -> dict[str, Any]:

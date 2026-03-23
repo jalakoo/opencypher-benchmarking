@@ -156,14 +156,20 @@ def _build_feature_map(results: dict[str, Any]) -> FeatureSupportMap:
 def _build_feature_map_from_tests(
     passed: list[dict], failed: list[dict], all_tests: list[dict]
 ) -> FeatureSupportMap:
-    """Build FeatureSupportMap from passed/failed test lists (for manual runner)."""
+    """Build FeatureSupportMap from passed/failed test lists (for manual runner).
+
+    The catalog uses "name" as the feature key, while the server-mode compliance
+    package uses "element".  We check both, plus "feature" as a fallback.
+    """
     clauses: set[str] = set()
     functions: set[str] = set()
     operators: set[str] = set()
     data_types: set[str] = set()
 
     for test in passed:
-        feature = test.get("element", test.get("feature", ""))
+        feature = test.get("name", test.get("element", test.get("feature", "")))
+        if not feature:
+            continue
         test_type = test.get("type", test.get("category", ""))
         match test_type:
             case "clause":
@@ -223,22 +229,29 @@ def _validate_result(result: Result, test: dict) -> bool:
     if test.get("expect_error"):
         return False
 
-    # Check expected_rows
-    if "expected_rows" in test:
-        expected = test["expected_rows"]
-        if result.records != expected:
-            return False
-
-    # Check expected_columns
-    if "expected_columns" in test:
-        expected_cols = test["expected_columns"]
+    # Check expected_columns first (needed for row comparison)
+    expected_cols = test.get("expected_columns", [])
+    if expected_cols:
         if result.records:
             actual_cols = list(result.records[0].keys())
             if sorted(actual_cols) != sorted(expected_cols):
                 return False
         else:
-            # No records — can't verify columns
-            if expected_cols:
+            return False
+
+    # Check expected_rows
+    if "expected_rows" in test:
+        expected = test["expected_rows"]
+        if result.records != expected:
+            # Records are dicts but expected_rows may be lists (catalog format).
+            # Convert dicts to positional lists using expected_columns order.
+            if expected_cols and result.records and isinstance(result.records[0], dict):
+                actual_as_lists = [
+                    [row.get(col) for col in expected_cols] for row in result.records
+                ]
+                if actual_as_lists != expected:
+                    return False
+            else:
                 return False
 
     # Check expected_contains
@@ -281,12 +294,12 @@ def load_cached_compliance(config: DatabaseConfig, ttl_seconds: int) -> FeatureS
             data_types=set(feat["data_types"]),
             pass_rate=feat["pass_rate"],
         )
-        # Reject cache entries with empty feature sets — likely from a previous
-        # parsing bug.  A valid compliance run always discovers at least one clause.
-        if not features.clauses:
-            logger.warning(
-                f"Cached compliance for {config.name} has empty clauses, re-running"
-            )
+        # Reject cache entries with empty or bogus feature sets — likely from a
+        # previous parsing bug.  A valid compliance run always discovers at least
+        # one real clause name (not empty string).
+        real_clauses = {c for c in features.clauses if c}
+        if not real_clauses:
+            logger.warning(f"Cached compliance for {config.name} has no valid clauses, re-running")
             return None
         return features
     except Exception as e:

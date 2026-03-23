@@ -87,3 +87,4 @@ class FullReport:
     version: str
     config: AppConfig
     databases: list[DatabaseReport] = field(default_factory=list)
+    duration_seconds: float | None = None
