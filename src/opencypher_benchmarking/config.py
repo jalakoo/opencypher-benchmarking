@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-from graph_db_comparison.models import AppConfig, BenchmarkConfig, DatabaseConfig, OutputConfig
+from opencypher_benchmarking.models import AppConfig, BenchmarkConfig, DatabaseConfig, OutputConfig
 
 VALID_ADAPTERS = {"bolt", "falkordb", "falkordblite", "ladybugdb"}
 SERVER_ADAPTERS = {"bolt", "falkordb"}

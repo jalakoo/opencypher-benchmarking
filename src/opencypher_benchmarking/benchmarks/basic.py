@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from graph_db_comparison.benchmarks import BenchmarkDefinition, register_benchmark
-from graph_db_comparison.data_generation import generate_persons
+from opencypher_benchmarking.benchmarks import BenchmarkDefinition, register_benchmark
+from opencypher_benchmarking.data_generation import generate_persons
 
 PREFIX = "_basic"
 

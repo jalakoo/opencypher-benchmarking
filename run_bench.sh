@@ -13,12 +13,12 @@ source "$VENV_DIR/bin/activate"
 # Install with all extras (server + embedded DBs)
 # Check for a driver package to detect if extras are actually installed
 if ! python -c "import neo4j" &>/dev/null; then
-    echo "Installing graph-db-comparison[all]..."
+    echo "Installing opencypher-benchmarking[all]..."
     pip install -q -e ".[all]"
 fi
 
 START_TIME=$SECONDS
-graph-db-bench "$@"
+ocb "$@"
 ELAPSED=$(( SECONDS - START_TIME ))
 echo "Total benchmark time: $((ELAPSED / 60))m $((ELAPSED % 60))s"
 

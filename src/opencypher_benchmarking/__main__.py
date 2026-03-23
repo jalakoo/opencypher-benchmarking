@@ -10,30 +10,30 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from graph_db_comparison import __version__
-from graph_db_comparison.benchmarks.runner import run_tier
-from graph_db_comparison.compatibility import (
+from opencypher_benchmarking import __version__
+from opencypher_benchmarking.benchmarks.runner import run_tier
+from opencypher_benchmarking.compatibility import (
     load_cached_compliance,
     run_embedded_compliance,
     run_server_compliance,
     save_compliance_cache,
 )
-from graph_db_comparison.config import load_config
-from graph_db_comparison.connections import create_adapter
-from graph_db_comparison.models import (
+from opencypher_benchmarking.config import load_config
+from opencypher_benchmarking.connections import create_adapter
+from opencypher_benchmarking.models import (
     AppConfig,
     DatabaseConfig,
     DatabaseReport,
     FeatureSupportMap,
     FullReport,
 )
-from graph_db_comparison.report.generator import (
+from opencypher_benchmarking.report.generator import (
     generate_html_report,
     generate_json_report,
     load_report_from_json,
 )
 
-logger = logging.getLogger("graph_db_comparison")
+logger = logging.getLogger("opencypher_benchmarking")
 
 ALL_TIERS = ["basic", "intermediate", "advanced"]
 
@@ -62,7 +62,7 @@ ALL_FEATURES = FeatureSupportMap(
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
-        prog="graph-db-bench",
+        prog="ocb",
         description="Graph database performance comparison tool",
     )
     parser.add_argument("-c", "--config", default="./config.yaml", help="Path to config.yaml")

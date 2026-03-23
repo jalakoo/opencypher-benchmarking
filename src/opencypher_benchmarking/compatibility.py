@@ -9,8 +9,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from graph_db_comparison.connections import DatabaseAdapter, Result
-from graph_db_comparison.models import DatabaseConfig, FeatureSupportMap
+from opencypher_benchmarking.connections import DatabaseAdapter, Result
+from opencypher_benchmarking.models import DatabaseConfig, FeatureSupportMap
 
 logger = logging.getLogger(__name__)
 

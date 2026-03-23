@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from graph_db_comparison.connections import Result, create_adapter
-from graph_db_comparison.models import DatabaseConfig
+from opencypher_benchmarking.connections import Result, create_adapter
+from opencypher_benchmarking.models import DatabaseConfig
 
 # --- Result class ---
 
@@ -47,7 +47,7 @@ def test_create_adapter_unknown_adapter_raises():
         create_adapter(config)
 
 
-@patch("graph_db_comparison.connections.BoltAdapter")
+@patch("opencypher_benchmarking.connections.BoltAdapter")
 def test_create_adapter_bolt(mock_bolt_cls):
     """create_adapter returns BoltAdapter for 'bolt' adapter."""
     config = DatabaseConfig(
@@ -64,7 +64,7 @@ def test_create_adapter_bolt(mock_bolt_cls):
     assert result is mock_bolt_cls.return_value
 
 
-@patch("graph_db_comparison.connections.FalkorDBAdapter")
+@patch("opencypher_benchmarking.connections.FalkorDBAdapter")
 def test_create_adapter_falkordb(mock_fdb_cls):
     """create_adapter returns FalkorDBAdapter for 'falkordb' adapter."""
     config = DatabaseConfig(
@@ -81,7 +81,7 @@ def test_create_adapter_falkordb(mock_fdb_cls):
     assert result is mock_fdb_cls.return_value
 
 
-@patch("graph_db_comparison.connections.FalkorDBLiteAdapter")
+@patch("opencypher_benchmarking.connections.FalkorDBLiteAdapter")
 def test_create_adapter_falkordblite(mock_fdbl_cls):
     """create_adapter returns FalkorDBLiteAdapter for 'falkordblite' adapter."""
     config = DatabaseConfig(
@@ -97,7 +97,7 @@ def test_create_adapter_falkordblite(mock_fdbl_cls):
     assert result is mock_fdbl_cls.return_value
 
 
-@patch("graph_db_comparison.connections.LadybugDBAdapter")
+@patch("opencypher_benchmarking.connections.LadybugDBAdapter")
 def test_create_adapter_ladybugdb(mock_ldb_cls):
     """create_adapter returns LadybugDBAdapter for 'ladybugdb' adapter."""
     config = DatabaseConfig(
@@ -156,12 +156,12 @@ def _make_ladybugdb_config() -> DatabaseConfig:
     )
 
 
-@patch("graph_db_comparison.connections._import_neo4j")
+@patch("opencypher_benchmarking.connections._import_neo4j")
 def test_bolt_adapter_has_protocol_methods(mock_import):
     """BoltAdapter has all required protocol methods."""
     mock_driver = MagicMock()
     mock_import.return_value = mock_driver
-    from graph_db_comparison.connections import BoltAdapter
+    from opencypher_benchmarking.connections import BoltAdapter
 
     adapter = BoltAdapter(_make_bolt_config())
     assert hasattr(adapter, "execute")
@@ -173,12 +173,12 @@ def test_bolt_adapter_has_protocol_methods(mock_import):
     assert callable(adapter.close)
 
 
-@patch("graph_db_comparison.connections._import_falkordb")
+@patch("opencypher_benchmarking.connections._import_falkordb")
 def test_falkordb_adapter_has_protocol_methods(mock_import):
     """FalkorDBAdapter has all required protocol methods."""
     mock_db = MagicMock()
     mock_import.return_value = mock_db
-    from graph_db_comparison.connections import FalkorDBAdapter
+    from opencypher_benchmarking.connections import FalkorDBAdapter
 
     adapter = FalkorDBAdapter(_make_falkordb_config())
     assert hasattr(adapter, "execute")
@@ -188,12 +188,12 @@ def test_falkordb_adapter_has_protocol_methods(mock_import):
     assert hasattr(adapter, "close")
 
 
-@patch("graph_db_comparison.connections._import_falkordblite")
+@patch("opencypher_benchmarking.connections._import_falkordblite")
 def test_falkordblite_adapter_has_protocol_methods(mock_import):
     """FalkorDBLiteAdapter has all required protocol methods."""
     mock_db = MagicMock()
     mock_import.return_value = mock_db
-    from graph_db_comparison.connections import FalkorDBLiteAdapter
+    from opencypher_benchmarking.connections import FalkorDBLiteAdapter
 
     adapter = FalkorDBLiteAdapter(_make_falkordblite_config())
     assert hasattr(adapter, "execute")
@@ -203,13 +203,13 @@ def test_falkordblite_adapter_has_protocol_methods(mock_import):
     assert hasattr(adapter, "close")
 
 
-@patch("graph_db_comparison.connections._import_ladybugdb")
+@patch("opencypher_benchmarking.connections._import_ladybugdb")
 def test_ladybugdb_adapter_has_protocol_methods(mock_import):
     """LadybugDBAdapter has all required protocol methods."""
     mock_db = MagicMock()
     mock_conn = MagicMock()
     mock_import.return_value = (mock_db, mock_conn)
-    from graph_db_comparison.connections import LadybugDBAdapter
+    from opencypher_benchmarking.connections import LadybugDBAdapter
 
     adapter = LadybugDBAdapter(_make_ladybugdb_config())
     assert hasattr(adapter, "execute")
@@ -222,7 +222,7 @@ def test_ladybugdb_adapter_has_protocol_methods(mock_import):
 # --- BoltAdapter behavior with mocks ---
 
 
-@patch("graph_db_comparison.connections._import_neo4j")
+@patch("opencypher_benchmarking.connections._import_neo4j")
 def test_bolt_execute_runs_cypher(mock_import):
     """BoltAdapter.execute() runs a Cypher query through the driver."""
     mock_driver = MagicMock()
@@ -232,29 +232,29 @@ def test_bolt_execute_runs_cypher(mock_import):
     mock_session.run.return_value.data.return_value = [{"n": 1}]
     mock_import.return_value = mock_driver
 
-    from graph_db_comparison.connections import BoltAdapter
+    from opencypher_benchmarking.connections import BoltAdapter
 
     adapter = BoltAdapter(_make_bolt_config())
     result = adapter.execute("RETURN 1 AS n")
     assert result.records == [{"n": 1}]
 
 
-@patch("graph_db_comparison.connections._import_neo4j")
+@patch("opencypher_benchmarking.connections._import_neo4j")
 def test_bolt_setup_schema_is_noop(mock_import):
     """BoltAdapter.setup_schema() does nothing."""
     mock_import.return_value = MagicMock()
-    from graph_db_comparison.connections import BoltAdapter
+    from opencypher_benchmarking.connections import BoltAdapter
 
     adapter = BoltAdapter(_make_bolt_config())
     adapter.setup_schema()  # should not raise
 
 
-@patch("graph_db_comparison.connections._import_neo4j")
+@patch("opencypher_benchmarking.connections._import_neo4j")
 def test_bolt_close_closes_driver(mock_import):
     """BoltAdapter.close() closes the underlying driver."""
     mock_driver = MagicMock()
     mock_import.return_value = mock_driver
-    from graph_db_comparison.connections import BoltAdapter
+    from opencypher_benchmarking.connections import BoltAdapter
 
     adapter = BoltAdapter(_make_bolt_config())
     adapter.close()
@@ -264,7 +264,7 @@ def test_bolt_close_closes_driver(mock_import):
 # --- FalkorDBAdapter behavior with mocks ---
 
 
-@patch("graph_db_comparison.connections._import_falkordb")
+@patch("opencypher_benchmarking.connections._import_falkordb")
 def test_falkordb_execute_runs_query(mock_import):
     """FalkorDBAdapter.execute() calls graph.query()."""
     mock_db = MagicMock()
@@ -274,7 +274,7 @@ def test_falkordb_execute_runs_query(mock_import):
     mock_graph.query.return_value.header = ["n"]
     mock_import.return_value = mock_db
 
-    from graph_db_comparison.connections import FalkorDBAdapter
+    from opencypher_benchmarking.connections import FalkorDBAdapter
 
     adapter = FalkorDBAdapter(_make_falkordb_config())
     result = adapter.execute("RETURN 1 AS n")
@@ -282,7 +282,7 @@ def test_falkordb_execute_runs_query(mock_import):
     assert isinstance(result, Result)
 
 
-@patch("graph_db_comparison.connections._import_falkordb")
+@patch("opencypher_benchmarking.connections._import_falkordb")
 def test_falkordb_execute_read_uses_ro_query(mock_import):
     """FalkorDBAdapter.execute_read() calls graph.ro_query()."""
     mock_db = MagicMock()
@@ -292,7 +292,7 @@ def test_falkordb_execute_read_uses_ro_query(mock_import):
     mock_graph.ro_query.return_value.header = ["n"]
     mock_import.return_value = mock_db
 
-    from graph_db_comparison.connections import FalkorDBAdapter
+    from opencypher_benchmarking.connections import FalkorDBAdapter
 
     adapter = FalkorDBAdapter(_make_falkordb_config())
     result = adapter.execute_read("RETURN 1 AS n")
@@ -300,13 +300,13 @@ def test_falkordb_execute_read_uses_ro_query(mock_import):
     assert isinstance(result, Result)
 
 
-@patch("graph_db_comparison.connections._import_falkordb")
+@patch("opencypher_benchmarking.connections._import_falkordb")
 def test_falkordb_uses_graph_name_from_config(mock_import):
     """FalkorDBAdapter selects graph using graph_name from config."""
     mock_db = MagicMock()
     mock_import.return_value = mock_db
 
-    from graph_db_comparison.connections import FalkorDBAdapter
+    from opencypher_benchmarking.connections import FalkorDBAdapter
 
     config = _make_falkordb_config()
     config.graph_name = "my_graph"
@@ -317,14 +317,14 @@ def test_falkordb_uses_graph_name_from_config(mock_import):
 # --- LadybugDBAdapter behavior with mocks ---
 
 
-@patch("graph_db_comparison.connections._import_ladybugdb")
+@patch("opencypher_benchmarking.connections._import_ladybugdb")
 def test_ladybugdb_setup_schema_creates_tables(mock_import):
     """LadybugDBAdapter.setup_schema() issues CREATE NODE/REL TABLE statements."""
     mock_db = MagicMock()
     mock_conn = MagicMock()
     mock_import.return_value = (mock_db, mock_conn)
 
-    from graph_db_comparison.connections import LadybugDBAdapter
+    from opencypher_benchmarking.connections import LadybugDBAdapter
 
     adapter = LadybugDBAdapter(_make_ladybugdb_config())
     adapter.setup_schema()

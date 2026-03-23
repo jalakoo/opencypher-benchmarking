@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from graph_db_comparison.compatibility import (
+from opencypher_benchmarking.compatibility import (
     _build_feature_map,
     _build_feature_map_from_tests,
     _parse_pass_rate,
@@ -17,8 +17,8 @@ from graph_db_comparison.compatibility import (
     load_cached_compliance,
     save_compliance_cache,
 )
-from graph_db_comparison.connections import Result
-from graph_db_comparison.models import DatabaseConfig, FeatureSupportMap
+from opencypher_benchmarking.connections import Result
+from opencypher_benchmarking.models import DatabaseConfig, FeatureSupportMap
 
 # --- _build_feature_map from opencypher-compliance results ---
 
@@ -361,7 +361,7 @@ def test_parse_pass_rate_none():
 
 def test_cache_roundtrip(tmp_path, monkeypatch):
     """Saving and loading compliance cache produces the same FeatureSupportMap."""
-    monkeypatch.setattr("graph_db_comparison.compatibility.CACHE_DIR", tmp_path)
+    monkeypatch.setattr("opencypher_benchmarking.compatibility.CACHE_DIR", tmp_path)
     config = DatabaseConfig(name="neo4j", adapter="bolt", enabled=True, host="localhost", port=7687)
     features = FeatureSupportMap(
         clauses={"MATCH", "CREATE"},
@@ -382,7 +382,7 @@ def test_cache_roundtrip(tmp_path, monkeypatch):
 
 def test_cache_expired_returns_none(tmp_path, monkeypatch):
     """Expired cache returns None."""
-    monkeypatch.setattr("graph_db_comparison.compatibility.CACHE_DIR", tmp_path)
+    monkeypatch.setattr("opencypher_benchmarking.compatibility.CACHE_DIR", tmp_path)
     config = DatabaseConfig(name="neo4j", adapter="bolt", enabled=True, host="localhost", port=7687)
     features = FeatureSupportMap(clauses={"MATCH"}, pass_rate=1.0)
     save_compliance_cache(config, features)
@@ -400,7 +400,7 @@ def test_cache_expired_returns_none(tmp_path, monkeypatch):
 
 def test_cache_missing_returns_none(tmp_path, monkeypatch):
     """Missing cache file returns None."""
-    monkeypatch.setattr("graph_db_comparison.compatibility.CACHE_DIR", tmp_path)
+    monkeypatch.setattr("opencypher_benchmarking.compatibility.CACHE_DIR", tmp_path)
     config = DatabaseConfig(name="neo4j", adapter="bolt", enabled=True, host="localhost", port=7687)
     loaded = load_cached_compliance(config, ttl_seconds=3600)
     assert loaded is None
@@ -408,7 +408,7 @@ def test_cache_missing_returns_none(tmp_path, monkeypatch):
 
 def test_cache_different_configs_different_files(tmp_path, monkeypatch):
     """Different database configs produce different cache files."""
-    monkeypatch.setattr("graph_db_comparison.compatibility.CACHE_DIR", tmp_path)
+    monkeypatch.setattr("opencypher_benchmarking.compatibility.CACHE_DIR", tmp_path)
     config1 = DatabaseConfig(
         name="neo4j", adapter="bolt", enabled=True, host="localhost", port=7687
     )
@@ -424,7 +424,7 @@ def test_cache_different_configs_different_files(tmp_path, monkeypatch):
 
 def test_cache_empty_clauses_rejected(tmp_path, monkeypatch):
     """Cache with empty clauses set is rejected (likely stale from parsing bug)."""
-    monkeypatch.setattr("graph_db_comparison.compatibility.CACHE_DIR", tmp_path)
+    monkeypatch.setattr("opencypher_benchmarking.compatibility.CACHE_DIR", tmp_path)
     config = DatabaseConfig(name="neo4j", adapter="bolt", enabled=True, host="localhost", port=7687)
     # Simulate a broken cache entry with empty feature sets but pass_rate=1.0
     features = FeatureSupportMap(clauses=set(), pass_rate=1.0)
@@ -435,7 +435,7 @@ def test_cache_empty_clauses_rejected(tmp_path, monkeypatch):
 
 def test_cache_empty_string_clauses_rejected(tmp_path, monkeypatch):
     """Cache with empty-string clause names is rejected as stale."""
-    monkeypatch.setattr("graph_db_comparison.compatibility.CACHE_DIR", tmp_path)
+    monkeypatch.setattr("opencypher_benchmarking.compatibility.CACHE_DIR", tmp_path)
     config = DatabaseConfig(name="fdb", adapter="falkordblite", enabled=True, db_path="/tmp/fdb")
     # Simulate a cache with "" in clauses (from wrong key extraction)
     features = FeatureSupportMap(clauses={""}, functions={""}, pass_rate=0.16)

@@ -4,7 +4,7 @@ import textwrap
 
 import pytest
 
-from graph_db_comparison.config import load_config, load_config_from_string
+from opencypher_benchmarking.config import load_config, load_config_from_string
 
 # --- Valid config loading ---
 

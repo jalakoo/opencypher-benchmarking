@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Protocol
 
-from graph_db_comparison.models import DatabaseConfig
+from opencypher_benchmarking.models import DatabaseConfig
 
 logger = logging.getLogger(__name__)
 

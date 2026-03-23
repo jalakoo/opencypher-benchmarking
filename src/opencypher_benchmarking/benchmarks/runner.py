@@ -8,9 +8,9 @@ import statistics
 import time
 from typing import Any
 
-from graph_db_comparison.benchmarks import BenchmarkDefinition, get_benchmarks_for_tier
-from graph_db_comparison.compatibility import check_benchmark_eligible, check_tier_eligible
-from graph_db_comparison.models import BenchmarkConfig, BenchmarkResult, FeatureSupportMap
+from opencypher_benchmarking.benchmarks import BenchmarkDefinition, get_benchmarks_for_tier
+from opencypher_benchmarking.compatibility import check_benchmark_eligible, check_tier_eligible
+from opencypher_benchmarking.models import BenchmarkConfig, BenchmarkResult, FeatureSupportMap
 
 logger = logging.getLogger(__name__)
 

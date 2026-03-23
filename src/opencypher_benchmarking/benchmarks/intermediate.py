@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from graph_db_comparison.benchmarks import BenchmarkDefinition, register_benchmark
-from graph_db_comparison.data_generation import (
+from opencypher_benchmarking.benchmarks import BenchmarkDefinition, register_benchmark
+from opencypher_benchmarking.data_generation import (
     generate_companies,
     generate_knows_edges,
     generate_persons,

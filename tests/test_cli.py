@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from graph_db_comparison.__main__ import build_parser, main, run_benchmarks, run_check
-from graph_db_comparison.models import (
+from opencypher_benchmarking.__main__ import build_parser, main, run_benchmarks, run_check
+from opencypher_benchmarking.models import (
     AppConfig,
     BenchmarkConfig,
     DatabaseConfig,
@@ -133,7 +133,7 @@ def _make_simple_config() -> AppConfig:
     )
 
 
-@patch("graph_db_comparison.__main__.create_adapter")
+@patch("opencypher_benchmarking.__main__.create_adapter")
 def test_run_check_reports_reachable(mock_create, capsys):
     """run_check prints reachable for successful connections."""
     mock_adapter = MagicMock()
@@ -150,7 +150,7 @@ def test_run_check_reports_reachable(mock_create, capsys):
     assert "db2" not in output
 
 
-@patch("graph_db_comparison.__main__.create_adapter")
+@patch("opencypher_benchmarking.__main__.create_adapter")
 def test_run_check_reports_unreachable(mock_create, capsys):
     """run_check prints error for failed connections."""
     mock_create.side_effect = ConnectionError("refused")
@@ -166,9 +166,9 @@ def test_run_check_reports_unreachable(mock_create, capsys):
 # --- run_benchmarks ---
 
 
-@patch("graph_db_comparison.__main__.run_tier")
-@patch("graph_db_comparison.__main__._run_compliance_with_cache")
-@patch("graph_db_comparison.__main__.create_adapter")
+@patch("opencypher_benchmarking.__main__.run_tier")
+@patch("opencypher_benchmarking.__main__._run_compliance_with_cache")
+@patch("opencypher_benchmarking.__main__.create_adapter")
 def test_run_benchmarks_basic_flow(mock_create, mock_compliance, mock_run_tier):
     """run_benchmarks connects, runs compliance, runs tiers, returns FullReport."""
     mock_adapter = MagicMock()
@@ -196,9 +196,9 @@ def test_run_benchmarks_basic_flow(mock_create, mock_compliance, mock_run_tier):
     assert mock_run_tier.call_count == 3
 
 
-@patch("graph_db_comparison.__main__.run_tier")
-@patch("graph_db_comparison.__main__._run_compliance_with_cache")
-@patch("graph_db_comparison.__main__.create_adapter")
+@patch("opencypher_benchmarking.__main__.run_tier")
+@patch("opencypher_benchmarking.__main__._run_compliance_with_cache")
+@patch("opencypher_benchmarking.__main__.create_adapter")
 def test_run_benchmarks_filters_by_database(mock_create, mock_compliance, mock_run_tier):
     """run_benchmarks skips databases not in -d filter."""
     mock_adapter = MagicMock()
@@ -235,9 +235,9 @@ def test_run_benchmarks_filters_by_database(mock_create, mock_compliance, mock_r
     assert report.databases[0].name == "neo4j"
 
 
-@patch("graph_db_comparison.__main__.run_tier")
-@patch("graph_db_comparison.__main__._run_compliance_with_cache")
-@patch("graph_db_comparison.__main__.create_adapter")
+@patch("opencypher_benchmarking.__main__.run_tier")
+@patch("opencypher_benchmarking.__main__._run_compliance_with_cache")
+@patch("opencypher_benchmarking.__main__.create_adapter")
 def test_run_benchmarks_filters_by_tier(mock_create, mock_compliance, mock_run_tier):
     """run_benchmarks only runs tiers specified by -t."""
     mock_adapter = MagicMock()
@@ -255,7 +255,7 @@ def test_run_benchmarks_filters_by_tier(mock_create, mock_compliance, mock_run_t
     assert mock_run_tier.call_args_list[0][0][1] == "basic"
 
 
-@patch("graph_db_comparison.__main__.create_adapter")
+@patch("opencypher_benchmarking.__main__.create_adapter")
 def test_run_benchmarks_connection_failure_continues(mock_create):
     """Connection failure for one DB doesn't stop others."""
     mock_create.side_effect = ConnectionError("refused")
@@ -269,8 +269,8 @@ def test_run_benchmarks_connection_failure_continues(mock_create):
     assert report.databases[0].compliance_error is not None
 
 
-@patch("graph_db_comparison.__main__._run_compliance_with_cache")
-@patch("graph_db_comparison.__main__.create_adapter")
+@patch("opencypher_benchmarking.__main__._run_compliance_with_cache")
+@patch("opencypher_benchmarking.__main__.create_adapter")
 def test_run_benchmarks_skip_compliance(mock_create, mock_compliance):
     """--skip-compliance skips compliance and runs benchmarks with all features assumed."""
     mock_adapter = MagicMock()
@@ -285,8 +285,8 @@ def test_run_benchmarks_skip_compliance(mock_create, mock_compliance):
     mock_compliance.assert_not_called()
 
 
-@patch("graph_db_comparison.__main__._run_compliance_with_cache")
-@patch("graph_db_comparison.__main__.create_adapter")
+@patch("opencypher_benchmarking.__main__._run_compliance_with_cache")
+@patch("opencypher_benchmarking.__main__.create_adapter")
 def test_run_benchmarks_compliance_only(mock_create, mock_compliance):
     """--compliance-only runs compliance but skips benchmarks."""
     mock_adapter = MagicMock()
@@ -307,12 +307,12 @@ def test_run_benchmarks_compliance_only(mock_create, mock_compliance):
 # --- main entry point ---
 
 
-@patch("graph_db_comparison.__main__.load_config")
+@patch("opencypher_benchmarking.__main__.load_config")
 def test_main_check_mode(mock_load, capsys):
     """main() in --check mode loads config and runs connectivity check."""
     mock_load.return_value = _make_simple_config()
 
-    with patch("graph_db_comparison.__main__.run_check") as mock_check:
-        with patch("sys.argv", ["graph-db-bench", "--check", "-c", "sample_config.yaml"]):
+    with patch("opencypher_benchmarking.__main__.run_check") as mock_check:
+        with patch("sys.argv", ["ocb", "--check", "-c", "sample_config.yaml"]):
             main()
         mock_check.assert_called_once()

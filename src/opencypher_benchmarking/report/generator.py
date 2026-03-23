@@ -10,7 +10,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from graph_db_comparison.models import (
+from opencypher_benchmarking.models import (
     AppConfig,
     BenchmarkConfig,
     BenchmarkResult,

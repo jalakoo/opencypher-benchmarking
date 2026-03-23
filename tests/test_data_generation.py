@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from graph_db_comparison.data_generation import (
+from opencypher_benchmarking.data_generation import (
     generate_companies,
     generate_knows_edges,
     generate_persons,

@@ -35,4 +35,4 @@ def get_benchmarks_for_tier(tier: str) -> list[BenchmarkDefinition]:
 
 
 # Import tier modules to trigger registration
-from graph_db_comparison.benchmarks import advanced, basic, intermediate  # noqa: E402, F401
+from opencypher_benchmarking.benchmarks import advanced, basic, intermediate  # noqa: E402, F401

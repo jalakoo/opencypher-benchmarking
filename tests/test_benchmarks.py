@@ -4,18 +4,18 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from graph_db_comparison.benchmarks import (
+from opencypher_benchmarking.benchmarks import (
     BENCHMARK_REGISTRY,
     BenchmarkDefinition,
     get_benchmarks_for_tier,
 )
-from graph_db_comparison.benchmarks.runner import (
+from opencypher_benchmarking.benchmarks.runner import (
     _percentile,
     run_single_benchmark,
     run_tier,
 )
-from graph_db_comparison.connections import Result
-from graph_db_comparison.models import BenchmarkConfig, FeatureSupportMap
+from opencypher_benchmarking.connections import Result
+from opencypher_benchmarking.models import BenchmarkConfig, FeatureSupportMap
 
 # --- Registry ---
 

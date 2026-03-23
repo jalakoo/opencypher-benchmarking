@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from graph_db_comparison.models import (
+from opencypher_benchmarking.models import (
     AppConfig,
     BenchmarkConfig,
     BenchmarkResult,
@@ -14,7 +14,7 @@ from graph_db_comparison.models import (
     FullReport,
     OutputConfig,
 )
-from graph_db_comparison.report.generator import (
+from opencypher_benchmarking.report.generator import (
     aggregate_report_data,
     generate_html_report,
     generate_json_report,
@@ -457,7 +457,7 @@ def test_json_report_redacts_passwords(tmp_path):
 
 def test_load_report_from_json_roundtrip(tmp_path):
     """A report saved as JSON can be loaded back and used to generate HTML."""
-    from graph_db_comparison.report.generator import load_report_from_json
+    from opencypher_benchmarking.report.generator import load_report_from_json
 
     report = _make_report()
     json_path = tmp_path / "results.json"
@@ -474,7 +474,7 @@ def test_load_report_from_json_roundtrip(tmp_path):
 
 def test_load_report_from_json_produces_valid_html(tmp_path):
     """A loaded JSON report can be rendered to valid HTML."""
-    from graph_db_comparison.report.generator import load_report_from_json
+    from opencypher_benchmarking.report.generator import load_report_from_json
 
     report = _make_report()
     json_path = tmp_path / "results.json"
@@ -491,7 +491,7 @@ def test_load_report_from_json_produces_valid_html(tmp_path):
 
 def test_load_report_from_json_preserves_results(tmp_path):
     """Loaded report preserves benchmark result data."""
-    from graph_db_comparison.report.generator import load_report_from_json
+    from opencypher_benchmarking.report.generator import load_report_from_json
 
     report = _make_report()
     json_path = tmp_path / "results.json"

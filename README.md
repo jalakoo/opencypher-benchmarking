@@ -1,6 +1,8 @@
-# Graph Database Performance Comparison Tool
+# openCypher Benchmarking Tool
 
 A Python-based benchmarking tool that compares six graph databases using openCypher queries across basic, intermediate, and advanced workloads.
+
+![openCypher Benchmarking Report](https://raw.githubusercontent.com/jalakoo/opencypher-benchmarking/main/assets/report_2026_03_17.png)
 
 ## Table of Contents
 
@@ -22,7 +24,7 @@ A Python-based benchmarking tool that compares six graph databases using openCyp
 
 ## Overview
 
-This tool benchmarks **Neo4j**, **Memgraph**, **ArcadeDB**, **FalkorDB**, **FalkorDB Lite**, and **LadybugDB** using a uniform set of Cypher queries. It uses the `opencypher-compliance` package to discover which features each database supports, then runs only eligible benchmarks. Results are output as a self-contained HTML report with radar charts, per-tier comparison tables, and warm-vs-cold analysis.
+This tool benchmarks **Neo4j**, **Memgraph**, **ArcadeDB**, **FalkorDB**, **FalkorDB Lite**, and **LadybugDB** using a uniform set of Cypher queries. It uses the `opencypher-compliance` package to discover which features each database supports, then runs only eligible benchmarks. Results are output as a self-contained HTML report with scorecard rankings, per-tier comparison tables, and warm-vs-cold analysis.
 
 ## Features
 
@@ -30,7 +32,7 @@ This tool benchmarks **Neo4j**, **Memgraph**, **ArcadeDB**, **FalkorDB**, **Falk
 - **31 benchmarks** across 3 tiers (basic, intermediate, advanced)
 - **Compliance gating**: automatically skips benchmarks requiring unsupported features
 - **Warm + cold** measurement for every benchmark
-- **HTML report**: self-contained with radar chart, sortable tables, bar charts, expandable details
+- **HTML report**: self-contained with scorecard grid, sortable tables, bar charts, tabbed navigation
 - **JSON export**: raw results for programmatic analysis
 - **Compliance caching**: avoids re-running the full compliance suite on every run
 - **Resilient**: one database failure doesn't stop the others
@@ -83,14 +85,14 @@ The easiest way is `run_bench.sh`, which auto-creates a virtual environment and 
 ./run_bench.sh --from-json reports/results.json
 ```
 
-All arguments are forwarded to `graph-db-bench`. If you prefer to manage the environment yourself:
+All arguments are forwarded to `ocb`. If you prefer to manage the environment yourself:
 
 ```bash
 pip install -e ".[all]"       # or: .[server], .[embedded]
-graph-db-bench -c config.yaml -v
+ocb -c config.yaml -v
 
 # Regenerate HTML from existing JSON results
-graph-db-bench --from-json reports/results.json
+ocb --from-json reports/results.json
 ```
 
 ### 4. View report
@@ -252,7 +254,7 @@ For server-mode databases, "cold" means no prior query activity on the dataset. 
 ## CLI Reference
 
 ```
-Usage: graph-db-bench [OPTIONS]
+Usage: ocb [OPTIONS]
 
 Options:
   -c, --config PATH          Path to config.yaml [default: ./config.yaml]
@@ -276,14 +278,13 @@ Options:
 
 The HTML report includes:
 
-1. **Executive Summary** — narrative findings, radar chart, tier winner badges
-2. **Compliance Matrix** — feature support per database (checkmarks/crosses)
-3. **Warm vs Cold Comparison** — cold/warm latency ratios
-4. **Benchmark Results by Tier** — side-by-side tables with bar charts
-5. **Read vs Write Breakdown** — separate performance tables
-6. **Detailed Results** — expandable per-database iteration data
-7. **Skipped Benchmarks** — what was skipped and why
-8. **Environment Info** — config (passwords redacted), versions
+1. **Scorecard Grid** — ranked database cards with avg median, pass rate, tier winners
+2. **Dataset Profile** — generated test data sizes per tier
+3. **Benchmark Results by Tier** — side-by-side tables with bar charts
+4. **Cold vs Warm Analysis** — summary and detailed cold/warm latency ratios
+5. **Detailed Results** — expandable per-database iteration data
+6. **Environment Info** — config (passwords redacted), versions
+7. **Limitations** — what the benchmarks cover and what they should not be used for
 
 Tables are sortable by clicking column headers. Databases are tagged `[server]` or `[embedded]` throughout.
 

@@ -3,21 +3,21 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "graph-db-comparison"
+name = "opencypher-benchmarking"
 version = "0.1.0"
 requires-python = ">=3.12"
-description = "Performance comparison tool for graph databases"
+description = "Performance benchmarking tool for openCypher graph databases"
 license = "MIT"
 dependencies = ["pyyaml", "jinja2"]
 
 [project.optional-dependencies]
 server = ["neo4j", "falkordb", "opencypher-compliance[all]"]
-embedded = ["falkordblite", "real_ladybug", "numpy"]
+embedded = ["falkordblite", "real_ladybug", "numpy", "pandas"]
 dev = ["pytest", "ruff"]
-all = ["graph-db-comparison[server,embedded,dev]"]
+all = ["opencypher-benchmarking[server,embedded,dev]"]
 
 [project.scripts]
-graph-db-bench = "graph_db_comparison.__main__:main"
+ocb = "opencypher_benchmarking.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
