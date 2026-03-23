@@ -274,13 +274,21 @@ def load_cached_compliance(config: DatabaseConfig, ttl_seconds: int) -> FeatureS
         if time.time() - data["timestamp"] > ttl_seconds:
             return None
         feat = data["features"]
-        return FeatureSupportMap(
+        features = FeatureSupportMap(
             clauses=set(feat["clauses"]),
             functions=set(feat["functions"]),
             operators=set(feat["operators"]),
             data_types=set(feat["data_types"]),
             pass_rate=feat["pass_rate"],
         )
+        # Reject cache entries with empty feature sets — likely from a previous
+        # parsing bug.  A valid compliance run always discovers at least one clause.
+        if not features.clauses:
+            logger.warning(
+                f"Cached compliance for {config.name} has empty clauses, re-running"
+            )
+            return None
+        return features
     except Exception as e:
         logger.warning(f"Failed to load compliance cache for {config.name}: {e}")
         return None

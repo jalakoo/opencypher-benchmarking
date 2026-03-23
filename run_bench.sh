@@ -17,4 +17,14 @@ if ! python -c "import neo4j" &>/dev/null; then
     pip install -q -e ".[all]"
 fi
 
-exec graph-db-bench "$@"
+START_TIME=$SECONDS
+graph-db-bench "$@"
+ELAPSED=$(( SECONDS - START_TIME ))
+echo "Total benchmark time: $((ELAPSED / 60))m $((ELAPSED % 60))s"
+
+# Auto-open the generated report if it exists
+REPORT="./reports/report.html"
+if [ -f "$REPORT" ]; then
+    echo "Opening $REPORT..."
+    open "$REPORT"
+fi

@@ -385,3 +385,14 @@ def test_cache_different_configs_different_files(tmp_path, monkeypatch):
     save_compliance_cache(config2, features)
     cache_files = list(tmp_path.glob("compliance_*.json"))
     assert len(cache_files) == 2
+
+
+def test_cache_empty_clauses_rejected(tmp_path, monkeypatch):
+    """Cache with empty clauses set is rejected (likely stale from parsing bug)."""
+    monkeypatch.setattr("graph_db_comparison.compatibility.CACHE_DIR", tmp_path)
+    config = DatabaseConfig(name="neo4j", adapter="bolt", enabled=True, host="localhost", port=7687)
+    # Simulate a broken cache entry with empty feature sets but pass_rate=1.0
+    features = FeatureSupportMap(clauses=set(), pass_rate=1.0)
+    save_compliance_cache(config, features)
+    loaded = load_cached_compliance(config, ttl_seconds=3600)
+    assert loaded is None
