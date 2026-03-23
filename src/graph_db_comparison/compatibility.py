@@ -114,17 +114,27 @@ def _parse_pass_rate(value: Any) -> float:
 
 
 def _build_feature_map(results: dict[str, Any]) -> FeatureSupportMap:
-    """Convert opencypher-compliance results dict into FeatureSupportMap."""
+    """Convert opencypher-compliance results dict into FeatureSupportMap.
+
+    The package returns:
+      - results["results"]: list of {"element": "MATCH", "type": "clause", "result": "pass", ...}
+      - results["metadata"]["pass_rate"]: float or string like "100.00%"
+    """
     clauses: set[str] = set()
     functions: set[str] = set()
     operators: set[str] = set()
     data_types: set[str] = set()
 
-    for test in results.get("tests", []):
-        if test.get("status") != "pass":
+    # The package uses "results" key (not "tests"), "result" (not "status"),
+    # "element" (not "feature"), and "type" (not "category")
+    test_list = results.get("results", results.get("tests", []))
+    for test in test_list:
+        status = test.get("result", test.get("status", ""))
+        if status != "pass":
             continue
-        feature = test.get("feature", "")
-        match test.get("category"):
+        feature = test.get("element", test.get("feature", ""))
+        test_type = test.get("type", test.get("category", ""))
+        match test_type:
             case "clause":
                 clauses.add(feature)
             case "function":
@@ -153,8 +163,9 @@ def _build_feature_map_from_tests(
     data_types: set[str] = set()
 
     for test in passed:
-        feature = test.get("feature", "")
-        match test.get("category"):
+        feature = test.get("element", test.get("feature", ""))
+        test_type = test.get("type", test.get("category", ""))
+        match test_type:
             case "clause":
                 clauses.add(feature)
             case "function":

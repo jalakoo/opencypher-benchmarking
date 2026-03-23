@@ -101,6 +101,30 @@ def test_build_feature_map_ignores_failed_tests():
     assert len(fm.data_types) == 0
 
 
+# --- _build_feature_map with actual opencypher-compliance format ---
+
+
+def test_build_feature_map_actual_package_format():
+    """Handle the actual opencypher-compliance result format (element/type/result keys)."""
+    results = {
+        "metadata": {"pass_rate": "100.00%"},
+        "results": [
+            {"element": "MATCH", "type": "clause", "result": "pass", "duration_ms": 13},
+            {"element": "CREATE", "type": "clause", "result": "pass", "duration_ms": 8},
+            {"element": "count", "type": "function", "result": "pass", "duration_ms": 5},
+            {"element": "STARTS WITH", "type": "operator", "result": "pass", "duration_ms": 3},
+            {"element": "Integer", "type": "data_type", "result": "fail", "duration_ms": 2},
+        ],
+    }
+    fm = _build_feature_map(results)
+    assert "MATCH" in fm.clauses
+    assert "CREATE" in fm.clauses
+    assert "count" in fm.functions
+    assert "STARTS WITH" in fm.operators
+    assert "Integer" not in fm.data_types  # failed
+    assert fm.pass_rate == pytest.approx(1.0)
+
+
 # --- _build_feature_map_from_tests (for embedded manual runner) ---
 
 
