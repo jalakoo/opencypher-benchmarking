@@ -16,7 +16,9 @@ def _bulk_create_persons(adapter: Any, scale: int) -> None:
     for i in range(0, len(persons), 100):
         batch = persons[i : i + 100]
         adapter.execute(
-            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Person) SET n = row",
+            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Person "
+            f"{{name: row.name, age: row.age, city: row.city, "
+            f"active: row.active, created: row.created}})",
             {"batch": batch},
         )
 
@@ -30,7 +32,11 @@ def _cleanup(adapter: Any) -> None:
 
 
 def _cleanup_rel(adapter: Any) -> None:
-    adapter.execute(f"MATCH (n) WHERE n:{PREFIX}_Person OR n:{PREFIX}_Target DETACH DELETE n")
+    adapter.execute(f"MATCH (n:{PREFIX}_Person) DETACH DELETE n")
+    try:
+        adapter.execute(f"MATCH (n:{PREFIX}_Target) DETACH DELETE n")
+    except Exception:
+        pass
 
 
 # --- 1. create_single_node ---

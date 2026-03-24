@@ -29,7 +29,9 @@ def _setup_social_graph(adapter: Any, scale: int) -> None:
     for i in range(0, len(persons), 100):
         batch = persons[i : i + 100]
         adapter.execute(
-            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Person) SET n = row",
+            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Person "
+            f"{{name: row.name, age: row.age, city: row.city, "
+            f"active: row.active, created: row.created}})",
             {"batch": batch},
         )
 
@@ -37,7 +39,8 @@ def _setup_social_graph(adapter: Any, scale: int) -> None:
     for i in range(0, len(companies), 50):
         batch = companies[i : i + 50]
         adapter.execute(
-            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Company) SET n = row",
+            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Company "
+            f"{{name: row.name, industry: row.industry, founded: row.founded}})",
             {"batch": batch},
         )
 
@@ -67,10 +70,11 @@ def _noop_setup(adapter: Any, scale: int) -> None:
 
 
 def _cleanup_all(adapter: Any) -> None:
-    adapter.execute(
-        f"MATCH (n) WHERE n:{PREFIX}_Person OR n:{PREFIX}_Company OR n:{PREFIX}_Temp "
-        f"DETACH DELETE n"
-    )
+    for label in [f"{PREFIX}_Temp", f"{PREFIX}_Person", f"{PREFIX}_Company"]:
+        try:
+            adapter.execute(f"MATCH (n:{label}) DETACH DELETE n")
+        except Exception:
+            pass
 
 
 # --- 1. index_creation ---
@@ -172,7 +176,7 @@ register_benchmark(
         required_features={"clauses": {"CREATE", "UNWIND"}},
         setup=_noop_setup,
         run=lambda a: a.execute(
-            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Temp) SET n = row",
+            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Temp {{name: row.name, val: row.val}})",
             {"batch": [{"name": f"bulk_{i}", "val": i} for i in range(1000)]},
         ),
         teardown=_cleanup_all,

@@ -328,12 +328,35 @@ def test_ladybugdb_setup_schema_creates_tables(mock_import):
 
     adapter = LadybugDBAdapter(_make_ladybugdb_config())
     adapter.setup_schema()
-    # _import_ladybugdb returns (db, conn), adapter stores conn as self._conn
-    # setup_schema calls self._conn.execute() for each schema statement
-    assert mock_conn.execute.call_count >= 4
     calls = [str(c) for c in mock_conn.execute.call_args_list]
     create_calls = [c for c in calls if "CREATE" in c]
-    assert len(create_calls) >= 4  # Person, Company, KNOWS, WORKS_AT
+    assert len(create_calls) >= 4
+
+
+@patch("opencypher_benchmarking.connections._import_ladybugdb")
+def test_ladybugdb_schema_includes_tier_prefixed_tables(mock_import):
+    """LadybugDBAdapter.setup_schema() creates tables for all benchmark tier prefixes."""
+    mock_db = MagicMock()
+    mock_conn = MagicMock()
+    mock_import.return_value = (mock_db, mock_conn)
+
+    from opencypher_benchmarking.connections import LadybugDBAdapter
+
+    adapter = LadybugDBAdapter(_make_ladybugdb_config())
+    adapter.setup_schema()
+    calls = " ".join(str(c) for c in mock_conn.execute.call_args_list)
+
+    # Must have node tables for all tier prefixes
+    for prefix in ["_basic", "_inter", "_adv"]:
+        assert f"{prefix}_Person" in calls, f"Missing {prefix}_Person node table"
+
+    # Must have company tables for inter and adv
+    assert "_inter_Company" in calls
+    assert "_adv_Company" in calls
+
+    # Must have rel tables for inter and adv
+    assert "_inter_KNOWS" in calls
+    assert "_adv_KNOWS" in calls
 
 
 def test_resolve_ladybugdb_path_appends_filename_to_directory(tmp_path):

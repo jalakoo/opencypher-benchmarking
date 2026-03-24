@@ -215,15 +215,31 @@ class FalkorDBLiteAdapter:
 class LadybugDBAdapter:
     """Adapter for LadybugDB (embedded, formerly Kuzu)."""
 
+    # LadybugDB requires explicit schema for all node/rel tables before data
+    # can be inserted. Benchmarks use tier-prefixed labels (_basic_, _inter_, _adv_).
+    _PERSON_COLS = "name STRING, age INT64, city STRING, active BOOLEAN, created STRING"
+    _COMPANY_COLS = "name STRING, industry STRING, founded INT64"
+
     SCHEMA_STATEMENTS = [
-        "CREATE NODE TABLE IF NOT EXISTS Person("
-        "name STRING, age INT64, city STRING, active BOOLEAN, created STRING, "
-        "PRIMARY KEY(name))",
-        "CREATE NODE TABLE IF NOT EXISTS Company("
-        "name STRING, industry STRING, founded INT64, "
-        "PRIMARY KEY(name))",
-        "CREATE REL TABLE IF NOT EXISTS KNOWS(FROM Person TO Person)",
-        "CREATE REL TABLE IF NOT EXISTS WORKS_AT(FROM Person TO Company)",
+        # --- Basic tier ---
+        f"CREATE NODE TABLE IF NOT EXISTS _basic_Person({_PERSON_COLS}, PRIMARY KEY(name))",
+        "CREATE NODE TABLE IF NOT EXISTS _basic_Target(name STRING, PRIMARY KEY(name))",
+        # --- Intermediate tier ---
+        f"CREATE NODE TABLE IF NOT EXISTS _inter_Person("
+        f"{_PERSON_COLS}, updated BOOLEAN, PRIMARY KEY(name))",
+        f"CREATE NODE TABLE IF NOT EXISTS _inter_Company({_COMPANY_COLS}, PRIMARY KEY(name))",
+        "CREATE NODE TABLE IF NOT EXISTS _inter_Temp(name STRING, val INT64, PRIMARY KEY(name))",
+        "CREATE REL TABLE IF NOT EXISTS _inter_KNOWS(FROM _inter_Person TO _inter_Person)",
+        "CREATE REL TABLE IF NOT EXISTS _inter_WORKS_AT(FROM _inter_Person TO _inter_Company)",
+        "CREATE REL TABLE IF NOT EXISTS LINKED(FROM _inter_Temp TO _inter_Temp)",
+        # --- Advanced tier ---
+        f"CREATE NODE TABLE IF NOT EXISTS _adv_Person("
+        f"{_PERSON_COLS}, counter INT64, PRIMARY KEY(name))",
+        f"CREATE NODE TABLE IF NOT EXISTS _adv_Company({_COMPANY_COLS}, PRIMARY KEY(name))",
+        "CREATE NODE TABLE IF NOT EXISTS _adv_Temp("
+        "name STRING, task INT64, seq INT64, ts STRING, PRIMARY KEY(name))",
+        "CREATE REL TABLE IF NOT EXISTS _adv_KNOWS(FROM _adv_Person TO _adv_Person)",
+        "CREATE REL TABLE IF NOT EXISTS _adv_WORKS_AT(FROM _adv_Person TO _adv_Company)",
     ]
 
     def __init__(self, config: DatabaseConfig) -> None:

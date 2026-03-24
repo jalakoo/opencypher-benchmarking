@@ -313,6 +313,45 @@ def test_run_benchmarks_compliance_only(mock_create, mock_compliance):
     assert report.databases[0].results == []
 
 
+# --- schema-required compliance bypass ---
+
+
+@patch("opencypher_benchmarking.__main__.run_tier")
+@patch("opencypher_benchmarking.__main__._run_compliance_with_cache")
+@patch("opencypher_benchmarking.__main__.create_adapter")
+def test_run_benchmarks_ladybugdb_skips_compliance(mock_create, mock_compliance, mock_run_tier):
+    """run_benchmarks uses curated features for ladybugdb, skipping compliance."""
+    mock_adapter = MagicMock()
+    mock_adapter.execute.return_value = MagicMock(records=[])
+    mock_create.return_value = mock_adapter
+    mock_run_tier.return_value = []
+
+    config = AppConfig(
+        databases={
+            "ladybugdb": DatabaseConfig(
+                name="ladybugdb",
+                adapter="ladybugdb",
+                enabled=True,
+                db_path="/tmp/test_ldb",
+            ),
+        },
+        benchmark=BenchmarkConfig(),
+        output=OutputConfig(),
+    )
+    parser = build_parser()
+    args = parser.parse_args([])
+
+    report = run_benchmarks(args, config)
+    # Compliance should NOT have been called for ladybugdb
+    mock_compliance.assert_not_called()
+    # But benchmarks should still run
+    assert mock_run_tier.call_count == 3  # basic, intermediate, advanced
+    # The report should have features set (curated, not None)
+    assert report.databases[0].compliance is not None
+    assert "MATCH" in report.databases[0].compliance.clauses
+    assert "CREATE" in report.databases[0].compliance.clauses
+
+
 # --- main entry point ---
 
 
@@ -357,12 +396,18 @@ def _make_full_report(databases: list[DatabaseReport], timestamp: str = "t0") ->
 def test_merge_reports_replaces_existing_db():
     """merge_reports replaces a database that exists in both reports."""
     old_result = BenchmarkResult(
-        benchmark_name="bench1", tier="basic", category="read",
-        database_name="db_b", status="pass",
+        benchmark_name="bench1",
+        tier="basic",
+        category="read",
+        database_name="db_b",
+        status="pass",
     )
     new_result = BenchmarkResult(
-        benchmark_name="bench1", tier="basic", category="read",
-        database_name="db_b", status="pass",
+        benchmark_name="bench1",
+        tier="basic",
+        category="read",
+        database_name="db_b",
+        status="pass",
     )
     existing = _make_full_report(
         [
@@ -384,6 +429,40 @@ def test_merge_reports_replaces_existing_db():
     db_b = next(db for db in merged.databases if db.name == "db_b")
     assert db_b.results[0] is new_result
     assert merged.timestamp == "t1"
+
+
+def test_merge_reports_keeps_existing_when_new_run_failed():
+    """merge_reports preserves existing results when new run failed (no results)."""
+    good_result = BenchmarkResult(
+        benchmark_name="bench1",
+        tier="basic",
+        category="read",
+        database_name="db_a",
+        status="pass",
+    )
+    existing = _make_full_report(
+        [DatabaseReport(name="db_a", mode="server", adapter="bolt", results=[good_result])],
+        timestamp="t0",
+    )
+    # New run failed to connect — has compliance_error but no results
+    new = _make_full_report(
+        [
+            DatabaseReport(
+                name="db_a",
+                mode="server",
+                adapter="bolt",
+                compliance_error="Connection refused",
+            )
+        ],
+        timestamp="t1",
+    )
+
+    merged = merge_reports(existing, new)
+    assert len(merged.databases) == 1
+    db_a = merged.databases[0]
+    # Should keep the existing good results, not replace with empty error entry
+    assert len(db_a.results) == 1
+    assert db_a.results[0] is good_result
 
 
 def test_merge_reports_adds_new_db():
@@ -442,8 +521,9 @@ def test_main_merge_loads_and_merges(mock_load, mock_run, mock_json, mock_html, 
     )
     mock_run.return_value = new_report
 
-    with patch("sys.argv", ["ocb", "--merge", "-c", "sample_config.yaml",
-                            "--output-dir", str(tmp_path)]):
+    with patch(
+        "sys.argv", ["ocb", "--merge", "-c", "sample_config.yaml", "--output-dir", str(tmp_path)]
+    ):
         main()
 
     # The report written should contain both databases
@@ -457,8 +537,9 @@ def test_main_merge_loads_and_merges(mock_load, mock_run, mock_json, mock_html, 
 @patch("opencypher_benchmarking.__main__.generate_json_report")
 @patch("opencypher_benchmarking.__main__.run_benchmarks")
 @patch("opencypher_benchmarking.__main__.load_config")
-def test_main_merge_without_existing_json_continues(mock_load, mock_run, mock_json, mock_html,
-                                                     tmp_path):
+def test_main_merge_without_existing_json_continues(
+    mock_load, mock_run, mock_json, mock_html, tmp_path
+):
     """main() with --merge when no results.json exists writes fresh report."""
     mock_load.return_value = _make_simple_config()
     new_report = _make_full_report(
@@ -466,8 +547,9 @@ def test_main_merge_without_existing_json_continues(mock_load, mock_run, mock_js
     )
     mock_run.return_value = new_report
 
-    with patch("sys.argv", ["ocb", "--merge", "-c", "sample_config.yaml",
-                            "--output-dir", str(tmp_path)]):
+    with patch(
+        "sys.argv", ["ocb", "--merge", "-c", "sample_config.yaml", "--output-dir", str(tmp_path)]
+    ):
         main()  # should not crash
 
     # Should still write the new report

@@ -12,12 +12,12 @@ source "$VENV_DIR/bin/activate"
 pip install -q -e ".[dev]"
 
 echo ""
-echo "=== Ruff check ==="
-ruff check src/ tests/
+echo "=== Ruff check (auto-fix) ==="
+ruff check --fix src/ tests/
 
 echo ""
-echo "=== Ruff format ==="
-ruff format --check src/ tests/
+echo "=== Ruff format (auto-fix) ==="
+ruff format src/ tests/
 
 echo ""
 echo "=== Pytest ==="

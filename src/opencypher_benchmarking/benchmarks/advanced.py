@@ -32,14 +32,17 @@ def _setup_large_graph(adapter: Any, scale: int) -> None:
     for i in range(0, len(persons), 200):
         batch = persons[i : i + 200]
         adapter.execute(
-            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Person) SET n = row",
+            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Person "
+            f"{{name: row.name, age: row.age, city: row.city, "
+            f"active: row.active, created: row.created}})",
             {"batch": batch},
         )
 
     for i in range(0, len(companies), 50):
         batch = companies[i : i + 50]
         adapter.execute(
-            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Company) SET n = row",
+            f"UNWIND $batch AS row CREATE (n:{PREFIX}_Company "
+            f"{{name: row.name, industry: row.industry, founded: row.founded}})",
             {"batch": batch},
         )
 
@@ -67,10 +70,11 @@ def _noop_setup(adapter: Any, scale: int) -> None:
 
 
 def _cleanup_all(adapter: Any) -> None:
-    adapter.execute(
-        f"MATCH (n) WHERE n:{PREFIX}_Person OR n:{PREFIX}_Company OR n:{PREFIX}_Temp "
-        f"DETACH DELETE n"
-    )
+    for label in [f"{PREFIX}_Temp", f"{PREFIX}_Person", f"{PREFIX}_Company"]:
+        try:
+            adapter.execute(f"MATCH (n:{label}) DETACH DELETE n")
+        except Exception:
+            pass
 
 
 # --- 1. shortest_path ---

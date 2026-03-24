@@ -37,6 +37,11 @@ logger = logging.getLogger("opencypher_benchmarking")
 
 ALL_TIERS = ["basic", "intermediate", "advanced"]
 
+# Adapters that require explicit schema (CREATE NODE TABLE) before any data ops.
+# The generic compliance suite can't run against these because it creates arbitrary
+# labels without schema. Use a curated feature map instead.
+SCHEMA_REQUIRED_ADAPTERS = {"ladybugdb"}
+
 # Feature map that assumes all features are supported (for --skip-compliance)
 ALL_FEATURES = FeatureSupportMap(
     clauses={
@@ -214,7 +219,12 @@ def run_benchmarks(args: argparse.Namespace, config: AppConfig) -> FullReport:
         # 2. Compliance
         features: FeatureSupportMap | None = None
         compliance_error: str | None = None
-        if not args.skip_compliance:
+        if db_config.adapter in SCHEMA_REQUIRED_ADAPTERS:
+            # Schema-required databases can't run the generic compliance suite
+            # (it creates arbitrary labels without pre-declaring tables).
+            features = ALL_FEATURES
+            logger.info(f"  Using curated features for {db_name} (schema-required adapter)")
+        elif not args.skip_compliance:
             features = _run_compliance_with_cache(db_config, adapter, args)
             if features is None:
                 compliance_error = "Compliance check failed"
@@ -271,12 +281,17 @@ def run_benchmarks(args: argparse.Namespace, config: AppConfig) -> FullReport:
 def merge_reports(existing: FullReport, new: FullReport) -> FullReport:
     """Merge new database results into an existing report.
 
-    Databases in *new* replace same-named databases in *existing*.
+    Databases in *new* replace same-named databases in *existing*,
+    but only when the new run produced results. Failed runs (connection
+    errors with no benchmark results) do not overwrite prior good data.
     Databases only in *existing* are preserved as-is.
     """
     merged = {db.name: db for db in existing.databases}
     for db in new.databases:
-        merged[db.name] = db
+        if db.results or db.name not in merged:
+            merged[db.name] = db
+        else:
+            logger.info(f"  Keeping prior results for {db.name} (new run had no results)")
 
     return FullReport(
         timestamp=new.timestamp,

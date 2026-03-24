@@ -49,10 +49,20 @@ This tool benchmarks **Neo4j**, **Memgraph**, **ArcadeDB**, **FalkorDB**, **Falk
 ### 1. Start databases with Docker
 
 ```bash
+# Start all server-mode databases
 docker compose up -d
+
+# Check status
+docker compose ps
+
+# Restart a specific database (e.g., if it crashed)
+docker compose restart falkordb
+
+# Stop all databases
+docker compose down
 ```
 
-This starts Neo4j, Memgraph, ArcadeDB, and FalkorDB with ports matching the sample config. No volume mounts — containers are ephemeral.
+This starts Neo4j, Memgraph, ArcadeDB, and FalkorDB with ports matching the sample config. No volume mounts — containers are ephemeral. All services use `restart: unless-stopped` so they recover automatically from crashes.
 
 Embedded databases (FalkorDB Lite, LadybugDB) require no Docker — they run in-process as Python packages.
 
@@ -312,6 +322,15 @@ pytest tests/ -v
 ```
 
 ## Troubleshooting
+
+**Database container not running:** A container may crash during benchmarking (especially FalkorDB under heavy load) and stop responding. Check status and restart:
+
+```bash
+docker compose ps        # check which containers are running
+docker compose restart falkordb  # restart a specific database
+docker compose up -d     # restart all stopped containers
+docker compose logs falkordb     # check logs for crash details
+```
 
 **Port conflicts:** If Docker containers fail to start, check for existing services on ports 7687, 7688, 7689, 6379, 7474, 2480.
 
